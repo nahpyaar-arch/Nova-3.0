@@ -116,8 +116,7 @@ const TR: Record<string, Record<string, string>> = {
     'profile.signOut': 'Abmelden',
 
     'admin.accessDenied.title': 'Zugriff verweigert',
-    'admin.accessDenied.text':
-      'Administratorrechte sind erforderlich.',
+    'admin.accessDenied.text': 'Administratorrechte sind erforderlich.',
     'admin.accessDenied.recheck': 'Status erneut prüfen',
   },
 
@@ -166,8 +165,7 @@ const TR: Record<string, Record<string, string>> = {
     'profile.signOut': 'Sair',
 
     'admin.accessDenied.title': 'Acesso negado',
-    'admin.accessDenied.text':
-      'Você precisa de privilégios de administrador.',
+    'admin.accessDenied.text': 'Você precisa de privilégios de administrador.',
     'admin.accessDenied.recheck': 'Verificar novamente',
   },
 
@@ -191,8 +189,7 @@ const TR: Record<string, Record<string, string>> = {
     'profile.signOut': 'Выйти',
 
     'admin.accessDenied.title': 'Доступ запрещён',
-    'admin.accessDenied.text':
-      'Нужны права администратора.',
+    'admin.accessDenied.text': 'Нужны права администратора.',
     'admin.accessDenied.recheck': 'Проверить снова',
   },
 
@@ -380,7 +377,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     initApp();
   }, []);
 
-  // Restore remembered user on reload and also load their transactions
+  // Restore user & transactions
   useEffect(() => {
     const savedEmail = localStorage.getItem('nova_user_email');
     if (!savedEmail) return;
@@ -394,7 +391,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (profile.language && profile.language !== language) {
             setLanguage(profile.language);
           }
-          // also pull transactions
           const txs = await NeonDB.getUserTransactions(profile.id);
           setTransactions(txs);
         }
@@ -708,8 +704,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setLanguage = (lang: string) => {
     setLanguageState(lang);
     localStorage.setItem('nova_lang', lang);
-    if (user?.id) {
-      NeonDB.setUserLanguage?.(user.id, lang).catch(() => {});
+    // Some builds don’t export setUserLanguage; guard it at runtime to satisfy TS and avoid crashes.
+    const maybeSetLang = (NeonDB as unknown as { setUserLanguage?: (id: string, l: string) => Promise<void> }).setUserLanguage;
+    if (user?.id && typeof maybeSetLang === 'function') {
+      maybeSetLang(user.id, lang).catch(() => {});
     }
   };
 
@@ -781,7 +779,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     pull();
     timer = window.setInterval(pull, pollMs);
-    return () => timer && window.clearInterval(timer);
+    // ✅ Explicitly return void cleanup to satisfy React types
+    return () => {
+      if (timer !== undefined) {
+        window.clearInterval(timer);
+      }
+    };
   }, [coins.length, persistMs, pollMs]);
 
   return (
@@ -792,7 +795,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         transactions,
         language,
         loading,
-        t, // 👈 expose translator
+        t,
         login,
         logout,
         register,
