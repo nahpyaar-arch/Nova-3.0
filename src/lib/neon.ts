@@ -24,6 +24,7 @@ export interface Profile {
   updated_at: string;
 }
 
+// src/lib/neon.ts
 export interface Coin {
   id: string;
   symbol: string;
@@ -32,11 +33,31 @@ export interface Coin {
   change_24h: number;
   volume: number;
   market_cap: number;
-  is_custom: boolean;
-  is_active: boolean;
+  isCustom: boolean;   // UI-friendly
+  is_active: boolean;  // DB-style
   created_at: string;
   updated_at: string;
 }
+
+// 👇 Add this normalizer (keeps UI camelCase while tolerating DB/mock snake_case)
+export function normalizeCoin(row: any): Coin {
+  const now = new Date().toISOString();
+  return {
+    id: row.id ?? crypto?.randomUUID?.() ?? String(Math.random()),
+    symbol: row.symbol,
+    name: row.name,
+    price: Number(row.price ?? 0),
+    change_24h: Number(row.change_24h ?? row.change24h ?? row.change24H ?? 0),
+    volume: Number(row.volume ?? 0),
+    market_cap: Number(row.market_cap ?? 0),
+    isCustom: Boolean(row.isCustom ?? row.is_custom ?? false),
+    is_active: Boolean(row.is_active ?? row.isActive ?? true),
+    created_at: row.created_at ?? now,
+    updated_at: row.updated_at ?? now,
+  };
+}
+
+
 
 export interface Transaction {
   id: string;

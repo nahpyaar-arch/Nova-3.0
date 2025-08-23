@@ -8,8 +8,15 @@ import { NeonDB } from '../lib/neon';
 
 type Tab = 'overview' | 'moon' | 'deposits' | 'withdrawals' | 'settings';
 
+type MoonSchedule = {
+  type: 'daily' | 'weekly';
+  percentage: string;
+  direction: 'increase' | 'decrease';
+};
+
 export default function AdminPage() {
-  const { user, coins, transactions, updateCoinPrice, updateBalance } = useApp();
+  // only pull what we actually use to avoid TS/ESLint “never read” noise
+  const { user, coins, updateCoinPrice } = useApp();
 
   // Works with either shape (DB uses is_admin; some older code used isAdmin)
   const isAdminFromUser = !!(user?.is_admin ?? (user as any)?.isAdmin);
@@ -20,9 +27,12 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [moonPrice, setMoonPrice] = useState('');
-  const [moonSchedule, setMoonSchedule] = useState({ type: 'daily', percentage: '', direction: 'increase' });
+  const [moonSchedule, setMoonSchedule] = useState<MoonSchedule>({
+    type: 'daily',
+    percentage: '',
+    direction: 'increase',
+  });
 
-  const [loadingQueues, setLoadingQueues] = useState(false);
   const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
   const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([]);
 
@@ -52,12 +62,14 @@ export default function AdminPage() {
 
   // ---- Data helpers --------------------------------------------------------
   const moonCoin = useMemo(() => coins.find((c) => c.symbol === 'MOON'), [coins]);
-  const safePrice = (moonCoin?.price ?? 0) as number;
-  const change = (moonCoin?.change24h ?? moonCoin?.change_24h ?? 0) as number;
+  const safePrice = Number(moonCoin?.price ?? 0);
+
+  // Accept both legacy `change24h` (camel) and current `change_24h` (snake)
+  // Casting to any on the first access avoids TS error while staying safe.
+  const change = Number((moonCoin as any)?.change24h ?? (moonCoin as any)?.change_24h ?? 0);
 
   async function loadQueues() {
     if (!isAllowed) return;
-    setLoadingQueues(true);
     try {
       const [deps, wds] = await Promise.all([
         NeonDB.getPendingTransactions('deposit'),
@@ -67,8 +79,6 @@ export default function AdminPage() {
       setPendingWithdrawals(wds);
     } catch (e) {
       console.error('Failed to load pending queues:', e);
-    } finally {
-      setLoadingQueues(false);
     }
   }
 
@@ -87,57 +97,54 @@ export default function AdminPage() {
 
   const handleScheduleMoonPrice = () => {
     if (!moonSchedule.percentage) return;
-    alert(`MOON price scheduled to ${moonSchedule.direction} by ${moonSchedule.percentage}% ${moonSchedule.type}`);
+    alert(
+      `MOON price scheduled to ${moonSchedule.direction} by ${moonSchedule.percentage}% ${moonSchedule.type}`
+    );
   };
 
-  /// Handle DEPOSIT actions using server-side helpers
-const handleDepositAction = async (
-  transactionId: string,
-  action: 'approve' | 'reject'
-) => {
-  const tx = pendingDeposits.find((x) => x.id === transactionId);
-  if (!tx) return;
+  // Handle DEPOSIT actions using server-side helpers
+  const handleDepositAction = async (
+    transactionId: string,
+    action: 'approve' | 'reject'
+  ) => {
+    const tx = pendingDeposits.find((x) => x.id === transactionId);
+    if (!tx) return;
 
-  try {
-    if (action === 'approve') {
-      // credit balance + mark completed (done in DB)
-      await NeonDB.approveDeposit(tx.id);
-    } else {
-      // just mark rejected
-      await NeonDB.rejectDeposit(tx.id);
+    try {
+      if (action === 'approve') {
+        await NeonDB.approveDeposit(tx.id);
+      } else {
+        await NeonDB.rejectDeposit(tx.id);
+      }
+    } catch (e) {
+      console.error('Failed to update deposit:', e);
+      alert('Failed to update deposit. See console for details.');
+    } finally {
+      await loadQueues();
     }
-  } catch (e) {
-    console.error('Failed to update deposit:', e);
-    alert('Failed to update deposit. See console for details.');
-  } finally {
-    await loadQueues(); // refresh the tables either way
-  }
-};
+  };
 
-// Handle WITHDRAWAL actions using server-side helpers
-const handleWithdrawalAction = async (
-  transactionId: string,
-  action: 'approve' | 'reject'
-) => {
-  const tx = pendingWithdrawals.find((x) => x.id === transactionId);
-  if (!tx) return;
+  // Handle WITHDRAWAL actions using server-side helpers
+  const handleWithdrawalAction = async (
+    transactionId: string,
+    action: 'approve' | 'reject'
+  ) => {
+    const tx = pendingWithdrawals.find((x) => x.id === transactionId);
+    if (!tx) return;
 
-  try {
-    if (action === 'approve') {
-      // mark completed (DB deducts balance or releases locked funds)
-      await NeonDB.approveWithdrawal(tx.id);
-    } else {
-      // refund (if locked) / credit back + mark rejected
-      await NeonDB.rejectWithdrawal(tx.id);
+    try {
+      if (action === 'approve') {
+        await NeonDB.approveWithdrawal(tx.id);
+      } else {
+        await NeonDB.rejectWithdrawal(tx.id);
+      }
+    } catch (e) {
+      console.error('Failed to update withdrawal:', e);
+      alert('Failed to update withdrawal. See console for details.');
+    } finally {
+      await loadQueues();
     }
-  } catch (e) {
-    console.error('Failed to update withdrawal:', e);
-    alert('Failed to update withdrawal. See console for details.');
-  } finally {
-    await loadQueues(); // refresh the tables either way
-  }
-};
-
+  };
 
   // ---- Gate ---------------------------------------------------------------
   if (!isAllowed) {
@@ -184,7 +191,7 @@ const handleWithdrawalAction = async (
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => setActiveTab(tab.id as Tab)}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? 'bg-purple-600 text-white'
@@ -290,7 +297,7 @@ const handleWithdrawalAction = async (
                   <label className="block text-sm font-medium text-gray-300 mb-2">Schedule Type</label>
                   <select
                     value={moonSchedule.type}
-                    onChange={(e) => setMoonSchedule({ ...moonSchedule, type: e.target.value })}
+                    onChange={(e) => setMoonSchedule({ ...moonSchedule, type: e.target.value as MoonSchedule['type'] })}
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="daily">Daily</option>
@@ -457,10 +464,8 @@ const handleWithdrawalAction = async (
         {/* Settings */}
         {activeTab === 'settings' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* … (unchanged settings UI) … */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
               <h2 className="text-xl font-bold text-white mb-6">Exchange Settings</h2>
-              {/* add your inputs here */}
               <p className="text-gray-400">Coming soon</p>
             </div>
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
