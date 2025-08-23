@@ -1,21 +1,28 @@
+// src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://zngdfevnruxghcyckjls.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpuZ2RmZXZucnV4Z2hjeWNramxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4NzU1NzksImV4cCI6MjA3MTQ1MTU3OX0.eQUi76LM1jPLb8IfifRf7Bfz9F5SFH-g8YIJHJJYTSY';
+// Rely on environment. Do not hardcode secrets in source.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  // Helpful message during local dev / misconfigured deploys
+  throw new Error(
+    'Missing Supabase env. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false
-  }
+    detectSessionInUrl: false,
+  },
 });
 
-// Database types
+// ─────────────────────────────────────────────────────────────
+// Database Types (shared in app)
+// ─────────────────────────────────────────────────────────────
 export interface Profile {
   id: string;
   email: string;
