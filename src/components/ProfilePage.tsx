@@ -1,7 +1,11 @@
 // src/components/ProfilePage.tsx
-import { useState } from 'react';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
+import { useState, useEffect, type FormEvent } from 'react';
+
 import { User, Mail, Globe, Bell, Shield, LogOut } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { supabase } from '../lib/supabase';
 
 export default function ProfilePage() {
   const { user, login, register, logout, language, setLanguage, refreshData, t } = useApp();
@@ -10,6 +14,18 @@ export default function ProfilePage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // 🔎 optional: confirm Supabase wiring (remove later if you like)
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').limit(1);
+        console.log('Supabase test →', { data, error });
+      } catch (e) {
+        console.error('Supabase test failed:', e);
+      }
+    })();
+  }, []);
 
   const LANGUAGES = [
     { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -24,20 +40,20 @@ export default function ProfilePage() {
     { code: 'zh', name: '中文', flag: '🇨🇳' },
   ];
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     try {
       const ok = isLogin ? await login(email, password) : await register(email, password, name);
-      if (!ok) alert(isLogin ? 'Invalid credentials' : 'Registration failed'); // (optional) add to i18n later
+      if (!ok) alert(isLogin ? 'Invalid credentials' : 'Registration failed');
     } catch {
-      alert('An error occurred'); // (optional) add to i18n later
+      alert('An error occurred');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ─────────────────────────── Unauthenticated view (login/register) ───────────────────────────
+  // ───────── Unauthenticated view (login/register) ─────────
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -131,7 +147,7 @@ export default function ProfilePage() {
     );
   }
 
-  // ─────────────────────────── Authenticated view (profile settings) ───────────────────────────
+  // ───────── Authenticated view (profile settings) ─────────
   return (
     <div className="min-h-screen bg-gray-900 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
