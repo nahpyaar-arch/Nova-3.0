@@ -1,5 +1,6 @@
+// src/components/TradePage.tsx
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, ArrowUpDown } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 
 export default function TradePage() {
@@ -11,13 +12,16 @@ export default function TradePage() {
   const [limitPrice, setLimitPrice] = useState('');
   const [showPreview, setShowPreview] = useState(false);
 
-  const selectedCoinData = coins.find(coin => coin.symbol === selectedCoin);
+  const selectedCoinData = coins.find((coin) => coin.symbol === selectedCoin);
   const userBalance = user?.balances[selectedCoin] || 0;
   const usdtBalance = user?.balances['USDT'] || 0;
 
   const calculateTotal = () => {
     if (!selectedCoinData || !amount) return 0;
-    const price = orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : selectedCoinData.price;
+    const price =
+      orderType === 'limit' && limitPrice
+        ? parseFloat(limitPrice)
+        : selectedCoinData.price;
     return parseFloat(amount) * price;
   };
 
@@ -51,9 +55,12 @@ export default function TradePage() {
       user_id: user.id,
       details: {
         tradeType,
-        price: orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : selectedCoinData.price,
-        total
-      }
+        price:
+          orderType === 'limit' && limitPrice
+            ? parseFloat(limitPrice)
+            : selectedCoinData.price,
+        total,
+      },
     }).catch(console.error);
 
     setAmount('');
@@ -93,7 +100,7 @@ export default function TradePage() {
                   onChange={(e) => setSelectedCoin(e.target.value)}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {coins.map(coin => (
+                  {coins.map((coin) => (
                     <option key={coin.symbol} value={coin.symbol}>
                       {coin.name} ({coin.symbol})
                     </option>
@@ -108,15 +115,29 @@ export default function TradePage() {
                     <div>
                       <p className="text-sm text-gray-400">Current Price</p>
                       <p className="text-xl font-bold text-white">
-                        ${selectedCoinData.price.toLocaleString(undefined, { 
-                          minimumFractionDigits: 2, 
-                          maximumFractionDigits: selectedCoinData.price < 1 ? 6 : 2 
+                        $
+                        {selectedCoinData.price.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits:
+                            selectedCoinData.price < 1 ? 6 : 2,
                         })}
                       </p>
                     </div>
-                    <div className={`flex items-center space-x-1 ${selectedCoinData.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {selectedCoinData.change24h >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                      <span className="font-semibold">{selectedCoinData.change24h.toFixed(2)}%</span>
+                    <div
+                      className={`flex items-center space-x-1 ${
+                        selectedCoinData.change_24h >= 0
+                          ? 'text-green-400'
+                          : 'text-red-400'
+                      }`}
+                    >
+                      {selectedCoinData.change_24h >= 0 ? (
+                        <TrendingUp className="w-5 h-5" />
+                      ) : (
+                        <TrendingDown className="w-5 h-5" />
+                      )}
+                      <span className="font-semibold">
+                        {selectedCoinData.change_24h.toFixed(2)}%
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -128,7 +149,9 @@ export default function TradePage() {
                   <button
                     onClick={() => setTradeType('buy')}
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      tradeType === 'buy' ? 'bg-green-600 text-white' : 'text-gray-300 hover:text-white'
+                      tradeType === 'buy'
+                        ? 'bg-green-600 text-white'
+                        : 'text-gray-300 hover:text-white'
                     }`}
                   >
                     Buy
@@ -136,7 +159,9 @@ export default function TradePage() {
                   <button
                     onClick={() => setTradeType('sell')}
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      tradeType === 'sell' ? 'bg-red-600 text-white' : 'text-gray-300 hover:text-white'
+                      tradeType === 'sell'
+                        ? 'bg-red-600 text-white'
+                        : 'text-gray-300 hover:text-white'
                     }`}
                   >
                     Sell
@@ -151,7 +176,9 @@ export default function TradePage() {
                   <button
                     onClick={() => setOrderType('market')}
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      orderType === 'market' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:text-white'
+                      orderType === 'market'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:text-white'
                     }`}
                   >
                     Market
@@ -159,7 +186,9 @@ export default function TradePage() {
                   <button
                     onClick={() => setOrderType('limit')}
                     className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                      orderType === 'limit' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:text-white'
+                      orderType === 'limit'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-300 hover:text-white'
                     }`}
                   >
                     Limit
@@ -170,7 +199,9 @@ export default function TradePage() {
               {/* Limit Price */}
               {orderType === 'limit' && (
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Limit Price (USDT)</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Limit Price (USDT)
+                  </label>
                   <input
                     type="number"
                     value={limitPrice}
@@ -194,7 +225,10 @@ export default function TradePage() {
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="mt-2 text-sm text-gray-400">
-                  Available: {tradeType === 'buy' ? usdtBalance.toFixed(2) + ' USDT' : userBalance.toFixed(6) + ' ' + selectedCoin}
+                  Available:{' '}
+                  {tradeType === 'buy'
+                    ? usdtBalance.toFixed(2) + ' USDT'
+                    : userBalance.toFixed(6) + ' ' + selectedCoin}
                 </div>
               </div>
 
@@ -203,7 +237,9 @@ export default function TradePage() {
                 <div className="mb-6 p-4 bg-gray-700 rounded-lg">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Total (USDT)</span>
-                    <span className="text-white font-semibold">{calculateTotal().toFixed(2)}</span>
+                    <span className="text-white font-semibold">
+                      {calculateTotal().toFixed(2)}
+                    </span>
                   </div>
                 </div>
               )}
@@ -233,10 +269,18 @@ export default function TradePage() {
                 <table className="w-full">
                   <thead className="bg-gray-700">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Coin</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Price</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">24h Change</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Action</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Coin
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Price
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        24h Change
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
@@ -254,15 +298,26 @@ export default function TradePage() {
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-white font-semibold">
-                          ${coin.price.toLocaleString(undefined, { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: coin.price < 1 ? 6 : 2 
+                          $
+                          {coin.price.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: coin.price < 1 ? 6 : 2,
                           })}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className={`flex items-center space-x-1 ${coin.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {coin.change24h >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                            <span className="text-sm font-semibold">{coin.change24h.toFixed(2)}%</span>
+                          <div
+                            className={`flex items-center space-x-1 ${
+                              coin.change_24h >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}
+                          >
+                            {coin.change_24h >= 0 ? (
+                              <TrendingUp className="w-4 h-4" />
+                            ) : (
+                              <TrendingDown className="w-4 h-4" />
+                            )}
+                            <span className="text-sm font-semibold">
+                              {coin.change_24h.toFixed(2)}%
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
@@ -291,23 +346,36 @@ export default function TradePage() {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Type</span>
-                    <span className={`font-semibold ${tradeType === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
+                    <span
+                      className={`font-semibold ${
+                        tradeType === 'buy' ? 'text-green-400' : 'text-red-400'
+                      }`}
+                    >
                       {tradeType.toUpperCase()} {selectedCoin}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Amount</span>
-                    <span className="text-white">{amount} {selectedCoin}</span>
+                    <span className="text-white">
+                      {amount} {selectedCoin}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Price</span>
                     <span className="text-white">
-                      ${(orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : selectedCoinData?.price || 0).toFixed(2)}
+                      $
+                      {(
+                        (orderType === 'limit' && limitPrice
+                          ? parseFloat(limitPrice)
+                          : selectedCoinData?.price || 0) as number
+                      ).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total</span>
-                    <span className="text-white font-semibold">{calculateTotal().toFixed(2)} USDT</span>
+                    <span className="text-white font-semibold">
+                      {calculateTotal().toFixed(2)} USDT
+                    </span>
                   </div>
                 </div>
                 <div className="flex space-x-3 mt-6">

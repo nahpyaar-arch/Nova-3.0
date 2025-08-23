@@ -1,3 +1,4 @@
+// src/components/MarketPage.tsx
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, Search, Star } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
@@ -8,20 +9,18 @@ export default function MarketPage() {
   const [selectedCoin, setSelectedCoin] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  const filteredCoins = coins.filter(coin =>
+  const filteredCoins = coins.filter((coin) =>
     coin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     coin.symbol.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const toggleFavorite = (symbol: string) => {
-    setFavorites(prev =>
-      prev.includes(symbol)
-        ? prev.filter(s => s !== symbol)
-        : [...prev, symbol]
+    setFavorites((prev) =>
+      prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
     );
   };
 
-  const selectedCoinData = coins.find(coin => coin.symbol === selectedCoin);
+  const selectedCoinData = coins.find((coin) => coin.symbol === selectedCoin);
 
   return (
     <div className="min-h-screen bg-gray-900 py-8">
@@ -96,22 +95,31 @@ export default function MarketPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-semibold">
-                          ${coin.price.toLocaleString(undefined, { 
-                            minimumFractionDigits: 2, 
-                            maximumFractionDigits: coin.price < 1 ? 6 : 2 
+                          $
+                          {coin.price.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: coin.price < 1 ? 6 : 2,
                           })}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`flex items-center space-x-1 ${coin.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {coin.change24h >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                            <span className="text-sm font-semibold">{coin.change24h.toFixed(2)}%</span>
+                          <div
+                            className={`flex items-center space-x-1 ${
+                              coin.change_24h >= 0 ? 'text-green-400' : 'text-red-400'
+                            }`}
+                          >
+                            {coin.change_24h >= 0 ? (
+                              <TrendingUp className="w-4 h-4" />
+                            ) : (
+                              <TrendingDown className="w-4 h-4" />
+                            )}
+                            <span className="text-sm font-semibold">{coin.change_24h.toFixed(2)}%</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                          ${(coin.volume / 1000000).toFixed(2)}M
+                          ${(coin.volume / 1_000_000).toFixed(2)}M
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                          ${(coin.marketCap / 1000000000).toFixed(2)}B
+                          ${(coin.market_cap / 1_000_000_000).toFixed(2)}B
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
@@ -155,32 +163,43 @@ export default function MarketPage() {
                     <div>
                       <p className="text-gray-400 text-sm">Current Price</p>
                       <p className="text-2xl font-bold text-white">
-                        ${selectedCoinData.price.toLocaleString(undefined, { 
-                          minimumFractionDigits: 2, 
-                          maximumFractionDigits: selectedCoinData.price < 1 ? 6 : 2 
+                        $
+                        {selectedCoinData.price.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: selectedCoinData.price < 1 ? 6 : 2,
                         })}
                       </p>
                     </div>
 
                     <div>
                       <p className="text-gray-400 text-sm">24h Change</p>
-                      <div className={`flex items-center space-x-1 ${selectedCoinData.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {selectedCoinData.change24h >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                        <span className="text-lg font-semibold">{selectedCoinData.change24h.toFixed(2)}%</span>
+                      <div
+                        className={`flex items-center space-x-1 ${
+                          selectedCoinData.change_24h >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}
+                      >
+                        {selectedCoinData.change_24h >= 0 ? (
+                          <TrendingUp className="w-5 h-5" />
+                        ) : (
+                          <TrendingDown className="w-5 h-5" />
+                        )}
+                        <span className="text-lg font-semibold">
+                          {selectedCoinData.change_24h.toFixed(2)}%
+                        </span>
                       </div>
                     </div>
 
                     <div>
                       <p className="text-gray-400 text-sm">24h Volume</p>
                       <p className="text-lg font-semibold text-white">
-                        ${(selectedCoinData.volume / 1000000).toFixed(2)}M
+                        ${(selectedCoinData.volume / 1_000_000).toFixed(2)}M
                       </p>
                     </div>
 
                     <div>
                       <p className="text-gray-400 text-sm">Market Cap</p>
                       <p className="text-lg font-semibold text-white">
-                        ${(selectedCoinData.marketCap / 1000000000).toFixed(2)}B
+                        ${(selectedCoinData.market_cap / 1_000_000_000).toFixed(2)}B
                       </p>
                     </div>
 
