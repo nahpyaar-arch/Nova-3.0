@@ -2,17 +2,25 @@
 [build]
   command = "npm run build"
   publish = "dist"
-functions = "netlify/functions"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["@neondatabase/serverless"]
+
+# 1) Canonicalize www to apex FIRST (processed in order)
+[[redirects]]
+  from = "https://www.novatradeapp.com/*"
+  to   = "https://novatradeapp.com/:splat"
+  status = 301
+  force = true
+
+# 2) SPA fallback
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to   = "/index.html"
   status = 200
 
-[functions."applyMoonPlan"]
-  schedule = "0 3 * * *"   # every day at 03:00 UTC
-# netlify.toml
-[[redirects]]
-from = "https://www.novatradeapp.com/*"
-to   = "https://novatradeapp.com/:splat"
-status = 301
-force = true
+# 3) Scheduled function (runs daily at 03:00 UTC)
+[functions.applyMoonPlan]
+  schedule = "0 3 * * *"

@@ -14,8 +14,8 @@ import {
   type Profile,
   type Coin,
   type Transaction,
+  pingDB,
 } from '../lib/neon';
-import { pingDB } from '../lib/neon';
 
 // Supabase helpers
 import { supabase, getProfileByEmail, createProfile } from '../lib/supabase';
@@ -297,7 +297,6 @@ interface AppContextType {
   updateCoinPrice: (symbol: string, price: number) => Promise<void>;
   refreshData: () => Promise<void>;
 
-  // NEW: expose a precise refresher you can call for any user
   refreshUserData?: (userId?: string) => Promise<void>;
 }
 
@@ -328,8 +327,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initApp = async () => {
       try {
-        await initializeDatabase();
-        const res = await pingDB();
+        await initializeDatabase(); // no-op on client stub
+        const res = await pingDB(); // { ok:false } on client stub
         console.log('Neon ping:', res);
         await loadCoins();
       } catch (error) {
@@ -341,22 +340,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     initApp();
   }, []);
 
-  // Restore user & transactions
+  // Restore user & transactions (from Supabase + fallbacks)
   useEffect(() => {
     const savedEmail = localStorage.getItem('nova_user_email');
     if (!savedEmail) return;
     (async () => {
       try {
-        const profile = await NeonDB.getUserByEmail(savedEmail);
-        if (profile) {
-          const balances = await NeonDB.getUserBalances(profile.id);
-          setUser({ ...profile, balances });
-          if (profile.language && profile.language !== language) {
-            setLanguage(profile.language);
-          }
-          const txs = await NeonDB.getUserTransactions(profile.id);
-          setTransactions(txs);
+        const { profile: sbProfile } = await getProfileByEmail(savedEmail);
+        if (!sbProfile) return;
+
+        const now = new Date().toISOString();
+        const derived: Profile = {
+          id: (sbProfile as any).id ?? crypto.randomUUID(),
+          email: savedEmail,
+          name: sbProfile.name ?? savedEmail.split('@')[0],
+          is_admin: !!sbProfile.is_admin,
+          language: (sbProfile as any).language ?? 'en',
+          created_at: now,
+          updated_at: now,
+        };
+
+        const balances = await NeonDB.getUserBalances(derived.id);
+        setUser({ ...derived, balances });
+        if (derived.language && derived.language !== language) {
+          setLanguage(derived.language);
         }
+
+        const txs = await NeonDB.getUserTransactions(derived.id);
+        setTransactions(txs);
       } catch (e) {
         console.warn('Could not restore user:', e);
         localStorage.removeItem('nova_user_email');
@@ -526,7 +537,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // NEW: single refresher you can call after any DB mutation
   const refreshUserData = async (targetUserId?: string): Promise<void> => {
     try {
       const uid = targetUserId ?? user?.id;
@@ -535,7 +545,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         NeonDB.getUserBalances(uid),
         NeonDB.getUserTransactions(uid),
       ]);
-      // normalize decimals just in case
       Object.keys(bals).forEach((k) => (bals[k] = Number(bals[k] ?? 0)));
       setUser((prev) => (prev ? { ...prev, balances: bals } : prev));
       setTransactions(txs);
@@ -546,73 +555,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshProfileFromDB = async () => {
     if (!user) return;
-    const fresh = await NeonDB.getUserByEmail(user.email);
+    const { profile: fresh } = await getProfileByEmail(user.email);
     if (fresh) {
-      setUser((prev) => (prev ? { ...prev, ...fresh } : prev));
-      if (fresh.language && fresh.language !== language) {
-        setLanguage(fresh.language);
+      const now = new Date().toISOString();
+      const merged: Profile = {
+        id: (fresh as any).id ?? user.id,
+        email: user.email,
+        name: fresh.name ?? user.name,
+        is_admin: !!fresh.is_admin,
+        language: (fresh as any).language ?? user.language ?? 'en',
+        created_at: user.created_at ?? now,
+        updated_at: now,
+      };
+      setUser((prev) => (prev ? { ...prev, ...merged } : prev));
+      if (merged.language && merged.language !== language) {
+        setLanguage(merged.language);
       }
     }
   };
 
-  /* ────────────── Auth: Supabase + Neon profile ────────────── */
+  /* ────────────── Auth: Supabase + server upsert ────────────── */
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-// 1) Supabase auth
-const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-if (error) {
-  console.error('Auth signIn failed:', error);
-  return false;
-}
-
-// 2) Upsert profile on the server (Netlify Function)
-try {
-  const user = data.user!;
-  await fetch('/.netlify/functions/upsert-profile', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: user.id,
-      email: user.email,
-      // derive a safe name without relying on an undefined form variable
-      name:
-        (user.user_metadata as any)?.name ??
-        (user.user_metadata as any)?.full_name ??
-        (user.email ? user.email.split('@')[0] : 'user'),
-    }),
-  });
-} catch (err) {
-  console.error('Profile sync failed:', err);
-}
-
-
-
-      // 2) Supabase profile (for is_admin/name, etc.)
-      const { profile: sbProfile, error: profileErr } =
-        await getProfileByEmail(email);
-      if (profileErr) {
-        console.warn('getProfileByEmail warning:', profileErr);
+      // 1) Supabase auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) {
+        console.error('Auth signIn failed:', error);
+        return false;
       }
 
-      // 3) Ensure local Neon user
-      let local = await NeonDB.getUserByEmail(email);
-      if (!local) {
-        local = await NeonDB.createUser(
-          email,
-          sbProfile?.name ?? email.split('@')[0],
-          sbProfile?.is_admin ?? false
-        );
+      // 2) Upsert profile on the server (Netlify Function → Neon)
+      try {
+        const u = data.user!;
+        await fetch('/.netlify/functions/upsert-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: u.id,
+            email: u.email,
+            name:
+              (u.user_metadata as any)?.name ??
+              (u.user_metadata as any)?.full_name ??
+              (u.email ? u.email.split('@')[0] : 'user'),
+          }),
+        });
+      } catch (err) {
+        console.error('Profile sync failed:', err);
       }
 
-      // 4) Load balances, set context, language
-      const balances = await NeonDB.getUserBalances(local.id);
-      setUser({ ...local, balances });
-      if (local.language && local.language !== language) {
-        setLanguage(local.language);
+      // 3) Read profile from Supabase (public) and build local user
+      const { profile: sbProfile } = await getProfileByEmail(email);
+      const now = new Date().toISOString();
+      const localProfile: Profile = {
+        id: (sbProfile as any)?.id ?? data.user?.id ?? crypto.randomUUID(),
+        email,
+        name: sbProfile?.name ?? email.split('@')[0],
+        is_admin: !!sbProfile?.is_admin,
+        language: (sbProfile as any)?.language ?? 'en',
+        created_at: now,
+        updated_at: now,
+      };
+
+      // 4) Load balances & txs and set context
+      const balances = await NeonDB.getUserBalances(localProfile.id);
+      setUser({ ...localProfile, balances });
+      if (localProfile.language && localProfile.language !== language) {
+        setLanguage(localProfile.language);
       }
 
-      localStorage.setItem('nova_user_email', local.email);
-      await loadUserData(local.id);
+      localStorage.setItem('nova_user_email', localProfile.email);
+      await loadUserData(localProfile.id);
       await refreshData();
 
       return true;
@@ -648,17 +663,38 @@ try {
         console.warn('createProfile warning:', error);
       }
 
-      // 3) Make sure local Neon user exists too
-      let local = await NeonDB.getUserByEmail(email);
-      if (!local) {
-        local = await NeonDB.createUser(email, name, isAdmin);
+      // 3) Upsert Neon profile via Netlify Function (server-side)
+      try {
+        await fetch('/.netlify/functions/upsert-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: (authData as any)?.user?.id,
+            email,
+            name,
+            is_admin: isAdmin,
+          }),
+        });
+      } catch (e) {
+        console.warn('Server profile upsert failed (non-fatal):', e);
       }
 
-      // 4) Load balances and set context
-      const balances = await NeonDB.getUserBalances(local.id);
-      setUser({ ...local, balances });
-      localStorage.setItem('nova_user_email', local.email);
-      await loadUserData(local.id);
+      // 4) Build local user (balances via safe fallback)
+      const now = new Date().toISOString();
+      const localProfile: Profile = {
+        id: (authData as any)?.user?.id ?? crypto.randomUUID(),
+        email,
+        name,
+        is_admin: isAdmin,
+        language: 'en',
+        created_at: now,
+        updated_at: now,
+      };
+
+      const balances = await NeonDB.getUserBalances(localProfile.id);
+      setUser({ ...localProfile, balances });
+      localStorage.setItem('nova_user_email', localProfile.email);
+      await loadUserData(localProfile.id);
 
       return true;
     } catch (e) {
@@ -686,7 +722,6 @@ try {
     if (!user) return;
     try {
       await NeonDB.updateUserBalance(user.id, coinSymbol, amount);
-      // IMPORTANT: do not do local math; pull fresh from Neon
       await refreshUserData(user.id);
     } catch (error) {
       console.error('Error updating balance:', error);
@@ -831,7 +866,6 @@ try {
         addTransaction,
         updateCoinPrice,
         refreshData,
-        // NEW: make refresher available to AdminPage and others
         refreshUserData,
       }}
     >
