@@ -395,15 +395,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('nova_lang', language);
   }, [language]);
 
-  // ── Data loaders
-  const loadCoins = async () => {
-    try {
-      const coinsData = await NeonDB.getCoins(); // client stub returns mock list
-      setCoins(coinsData.map(normalizeCoin) as any);
-    } catch (error) {
-      console.error('Error loading coins:', error);
+  // Replace your current loadCoins with this:
+const loadCoins = async () => {
+  try {
+    // 1) Try server (Neon) via Netlify Function
+    const res = await fetch('/.netlify/functions/get-coins', { cache: 'no-store' });
+    if (res.ok) {
+      const { coins } = await res.json();
+      setCoins(coins.map(normalizeCoin) as any);
+      return;
+    } else {
+      console.warn('get-coins non-200:', res.status, await res.text());
     }
-  };
+  } catch (e) {
+    console.warn('get-coins failed, falling back to stub:', e);
+  }
+
+  // 2) Fallback to client stub (mock list) if server isn’t available
+  try {
+    const coinsData = await NeonDB.getCoins();
+    setCoins(coinsData.map(normalizeCoin) as any);
+  } catch (error) {
+    console.error('Error loading coins:', error);
+  }
+};
+
 
   const loadUserData = async (userId: string) => {
     try {
