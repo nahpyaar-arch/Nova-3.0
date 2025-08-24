@@ -7,6 +7,7 @@ import {
   type ReactNode,
   useRef,
 } from 'react';
+
 import {
   NeonDB,
   initializeDatabase,
@@ -16,9 +17,11 @@ import {
 } from '../lib/neon';
 import { pingDB } from '../lib/neon';
 
+// Supabase helpers
+import { supabase, getProfileByEmail, createProfile } from '../lib/supabase';
+
 /* ──────────────────────────────────────────────────────────────────────────
-   Translations (minimal set used for nav, profile, admin access gate).
-   Add keys as you localize more screens. Fallback is English.
+   Translations
    ────────────────────────────────────────────────────────────────────────── */
 const TR: Record<string, Record<string, string>> = {
   en: {
@@ -28,7 +31,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': 'Assets',
     'nav.profile': 'Profile',
     'nav.admin': 'Admin',
-
     'profile.title': 'Profile Settings',
     'profile.accountInfo': 'Account Information',
     'profile.fullName': 'Full Name',
@@ -39,13 +41,11 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': 'Language & Region',
     'profile.preferredLanguage': 'Preferred Language',
     'profile.signOut': 'Sign Out',
-
     'admin.accessDenied.title': 'Access Denied',
     'admin.accessDenied.text':
       'You need administrator privileges to access this page.',
     'admin.accessDenied.recheck': 'Recheck Admin Status',
   },
-
   es: {
     'nav.home': 'Inicio',
     'nav.market': 'Mercado',
@@ -53,7 +53,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': 'Activos',
     'nav.profile': 'Perfil',
     'nav.admin': 'Admin',
-
     'profile.title': 'Configuración de Perfil',
     'profile.accountInfo': 'Información de la cuenta',
     'profile.fullName': 'Nombre completo',
@@ -64,13 +63,11 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': 'Idioma y región',
     'profile.preferredLanguage': 'Idioma preferido',
     'profile.signOut': 'Cerrar sesión',
-
     'admin.accessDenied.title': 'Acceso denegado',
     'admin.accessDenied.text':
       'Necesitas privilegios de administrador para acceder.',
     'admin.accessDenied.recheck': 'Volver a comprobar',
   },
-
   fr: {
     'nav.home': 'Accueil',
     'nav.market': 'Marché',
@@ -78,7 +75,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': 'Actifs',
     'nav.profile': 'Profil',
     'nav.admin': 'Admin',
-
     'profile.title': 'Paramètres du profil',
     'profile.accountInfo': 'Informations du compte',
     'profile.fullName': 'Nom complet',
@@ -89,13 +85,11 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': 'Langue et région',
     'profile.preferredLanguage': 'Langue préférée',
     'profile.signOut': 'Se déconnecter',
-
     'admin.accessDenied.title': 'Accès refusé',
     'admin.accessDenied.text':
       "Vous avez besoin des privilèges d'administrateur.",
     'admin.accessDenied.recheck': 'Revérifier',
   },
-
   de: {
     'nav.home': 'Start',
     'nav.market': 'Markt',
@@ -103,7 +97,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': 'Vermögen',
     'nav.profile': 'Profil',
     'nav.admin': 'Admin',
-
     'profile.title': 'Profileinstellungen',
     'profile.accountInfo': 'Kontoinformationen',
     'profile.fullName': 'Vollständiger Name',
@@ -114,12 +107,10 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': 'Sprache & Region',
     'profile.preferredLanguage': 'Bevorzugte Sprache',
     'profile.signOut': 'Abmelden',
-
     'admin.accessDenied.title': 'Zugriff verweigert',
     'admin.accessDenied.text': 'Administratorrechte sind erforderlich.',
     'admin.accessDenied.recheck': 'Status erneut prüfen',
   },
-
   it: {
     'nav.home': 'Home',
     'nav.market': 'Mercato',
@@ -127,7 +118,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': 'Asset',
     'nav.profile': 'Profilo',
     'nav.admin': 'Admin',
-
     'profile.title': 'Impostazioni profilo',
     'profile.accountInfo': 'Informazioni account',
     'profile.fullName': 'Nome completo',
@@ -138,13 +128,11 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': 'Lingua e regione',
     'profile.preferredLanguage': 'Lingua preferita',
     'profile.signOut': 'Esci',
-
     'admin.accessDenied.title': 'Accesso negato',
     'admin.accessDenied.text':
       "Sono necessari i privilegi d'amministratore.",
     'admin.accessDenied.recheck': 'Ricontrolla stato',
   },
-
   pt: {
     'nav.home': 'Início',
     'nav.market': 'Mercado',
@@ -152,7 +140,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': 'Ativos',
     'nav.profile': 'Perfil',
     'nav.admin': 'Admin',
-
     'profile.title': 'Configurações do Perfil',
     'profile.accountInfo': 'Informações da conta',
     'profile.fullName': 'Nome completo',
@@ -163,12 +150,10 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': 'Idioma e região',
     'profile.preferredLanguage': 'Idioma preferido',
     'profile.signOut': 'Sair',
-
     'admin.accessDenied.title': 'Acesso negado',
     'admin.accessDenied.text': 'Você precisa de privilégios de administrador.',
     'admin.accessDenied.recheck': 'Verificar novamente',
   },
-
   ru: {
     'nav.home': 'Главная',
     'nav.market': 'Рынок',
@@ -176,7 +161,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': 'Активы',
     'nav.profile': 'Профиль',
     'nav.admin': 'Админ',
-
     'profile.title': 'Настройки профиля',
     'profile.accountInfo': 'Информация аккаунта',
     'profile.fullName': 'Полное имя',
@@ -187,12 +171,10 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': 'Язык и регион',
     'profile.preferredLanguage': 'Предпочитаемый язык',
     'profile.signOut': 'Выйти',
-
     'admin.accessDenied.title': 'Доступ запрещён',
     'admin.accessDenied.text': 'Нужны права администратора.',
     'admin.accessDenied.recheck': 'Проверить снова',
   },
-
   ja: {
     'nav.home': 'ホーム',
     'nav.market': 'マーケット',
@@ -200,7 +182,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': '資産',
     'nav.profile': 'プロフィール',
     'nav.admin': '管理',
-
     'profile.title': 'プロフィール設定',
     'profile.accountInfo': 'アカウント情報',
     'profile.fullName': '氏名',
@@ -211,12 +192,10 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': '言語と地域',
     'profile.preferredLanguage': '優先言語',
     'profile.signOut': 'サインアウト',
-
     'admin.accessDenied.title': 'アクセス拒否',
     'admin.accessDenied.text': '管理者権限が必要です。',
     'admin.accessDenied.recheck': '再チェック',
   },
-
   ko: {
     'nav.home': '홈',
     'nav.market': '마켓',
@@ -224,7 +203,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': '자산',
     'nav.profile': '프로필',
     'nav.admin': '관리',
-
     'profile.title': '프로필 설정',
     'profile.accountInfo': '계정 정보',
     'profile.fullName': '이름',
@@ -235,12 +213,10 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': '언어 및 지역',
     'profile.preferredLanguage': '기본 언어',
     'profile.signOut': '로그아웃',
-
     'admin.accessDenied.title': '접근 거부',
     'admin.accessDenied.text': '관리자 권한이 필요합니다.',
     'admin.accessDenied.recheck': '다시 확인',
   },
-
   zh: {
     'nav.home': '首页',
     'nav.market': '行情',
@@ -248,7 +224,6 @@ const TR: Record<string, Record<string, string>> = {
     'nav.assets': '资产',
     'nav.profile': '个人',
     'nav.admin': '后台',
-
     'profile.title': '个人设置',
     'profile.accountInfo': '账户信息',
     'profile.fullName': '姓名',
@@ -259,14 +234,12 @@ const TR: Record<string, Record<string, string>> = {
     'profile.languageRegion': '语言与地区',
     'profile.preferredLanguage': '首选语言',
     'profile.signOut': '退出登录',
-
     'admin.accessDenied.title': '无权访问',
     'admin.accessDenied.text': '需要管理员权限。',
     'admin.accessDenied.recheck': '重新检查',
   },
 };
 
-// Simple translator with fallback
 function translate(lang: string, key: string): string {
   const L = TR[lang] || TR.en;
   return L[key] || TR.en[key] || key;
@@ -293,6 +266,7 @@ const BINANCE_MAP: Record<string, string> = {
   DOT: 'DOTUSDT',
   MATIC: 'MATICUSDT',
 };
+
 const BINANCE_TO_LOCAL: Record<string, string> = Object.fromEntries(
   Object.entries(BINANCE_MAP).map(([k, v]) => [v, k]),
 );
@@ -322,30 +296,21 @@ interface AppContextType {
   ) => Promise<void>;
   updateCoinPrice: (symbol: string, price: number) => Promise<void>;
   refreshData: () => Promise<void>;
+
+  // NEW: expose a precise refresher you can call for any user
+  refreshUserData?: (userId?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-const users: Record<
-  string,
-  { email: string; password: string; name: string; isAdmin: boolean }
-> = {
-  'admin52980@gmail.com': {
-    email: 'admin52980@gmail.com',
-    password: '11111111',
-    name: 'Admin User',
-    isAdmin: true,
-  },
-};
 
 const toNum = (v: any, d = 0) =>
   v === null || v === undefined || v === '' ? d : Number(v);
 const normalizeCoin = (c: any) => ({
   ...c,
   price: toNum(c.price),
-  change24h: toNum(c.change24h ?? c.change_24h),
+  change24h: toNum((c as any).change24h ?? (c as any).change_24h),
   volume: toNum(c.volume),
-  market_cap: toNum(c.market_cap ?? c.marketCap),
+  market_cap: toNum((c as any).market_cap ?? (c as any).marketCap),
 });
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -357,7 +322,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const [loading, setLoading] = useState(true);
 
-  // translator fn bound to state
   const t = (key: string) => translate(language, key);
 
   // ── App init
@@ -387,7 +351,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (profile) {
           const balances = await NeonDB.getUserBalances(profile.id);
           setUser({ ...profile, balances });
-          // adopt DB language if present
           if (profile.language && profile.language !== language) {
             setLanguage(profile.language);
           }
@@ -395,7 +358,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setTransactions(txs);
         }
       } catch (e) {
-        console.warn('Could not restore user from storage:', e);
+        console.warn('Could not restore user:', e);
         localStorage.removeItem('nova_user_email');
       }
     })();
@@ -563,6 +526,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // NEW: single refresher you can call after any DB mutation
+  const refreshUserData = async (targetUserId?: string): Promise<void> => {
+    try {
+      const uid = targetUserId ?? user?.id;
+      if (!uid) return;
+      const [bals, txs] = await Promise.all([
+        NeonDB.getUserBalances(uid),
+        NeonDB.getUserTransactions(uid),
+      ]);
+      // normalize decimals just in case
+      Object.keys(bals).forEach((k) => (bals[k] = Number(bals[k] ?? 0)));
+      setUser((prev) => (prev ? { ...prev, balances: bals } : prev));
+      setTransactions(txs);
+    } catch (e) {
+      console.error('refreshUserData failed:', e);
+    }
+  };
+
   const refreshProfileFromDB = async () => {
     if (!user) return;
     const fresh = await NeonDB.getUserByEmail(user.email);
@@ -574,39 +555,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── Auth
+  /* ────────────── Auth: Supabase + Neon profile ────────────── */
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const memoryUser = users[email];
-      if (memoryUser && memoryUser.password === password) {
-        const profile: Profile = {
-          id: crypto.randomUUID(),
-          email: memoryUser.email,
-          name: memoryUser.name,
-          is_admin: memoryUser.isAdmin,
-          language: language,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        const balances = await NeonDB.getUserBalances(profile.id);
-        setUser({ ...profile, balances });
-        localStorage.setItem('nova_user_email', profile.email);
-        await loadUserData(profile.id);
-        return true;
+      // 1) Supabase Auth
+      const { error: authError } =
+        await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        console.error('Auth signIn failed:', authError);
+        return false;
       }
 
-      const profile = await NeonDB.getUserByEmail(email);
-      if (profile) {
-        const balances = await NeonDB.getUserBalances(profile.id);
-        setUser({ ...profile, balances });
-        localStorage.setItem('nova_user_email', profile.email);
-        if (profile.language && profile.language !== language) {
-          setLanguage(profile.language);
-        }
-        await loadUserData(profile.id);
-        return true;
+      // 2) Supabase profile (for is_admin/name, etc.)
+      const { profile: sbProfile, error: profileErr } =
+        await getProfileByEmail(email);
+      if (profileErr) {
+        console.warn('getProfileByEmail warning:', profileErr);
       }
-      return false;
+
+      // 3) Ensure local Neon user
+      let local = await NeonDB.getUserByEmail(email);
+      if (!local) {
+        local = await NeonDB.createUser(
+          email,
+          sbProfile?.name ?? email.split('@')[0],
+          sbProfile?.is_admin ?? false
+        );
+      }
+
+      // 4) Load balances, set context, language
+      const balances = await NeonDB.getUserBalances(local.id);
+      setUser({ ...local, balances });
+      if (local.language && local.language !== language) {
+        setLanguage(local.language);
+      }
+
+      localStorage.setItem('nova_user_email', local.email);
+      await loadUserData(local.id);
+      await refreshData();
+
+      return true;
     } catch (e) {
       console.error('Login error:', e);
       return false;
@@ -619,14 +607,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     name: string
   ): Promise<boolean> => {
     try {
-      const isAdmin = email === 'admin52980@gmail.com';
-      const profile = await NeonDB.createUser(email, name, isAdmin);
-      users[email] = { email, password, name, isAdmin };
+      // 1) Create auth user in Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: window.location.origin + '/profile' },
+      });
+      console.log('supabase.auth.signUp →', { authData, authError });
+      if (authError) {
+        alert(`Sign up failed: ${authError.message}`);
+        return false;
+      }
 
-      const balances = await NeonDB.getUserBalances(profile.id);
-      setUser({ ...profile, balances });
-      localStorage.setItem('nova_user_email', profile.email);
-      await loadUserData(profile.id);
+      // 2) Create a Supabase profiles row (public table)
+      const isAdmin = email === 'admin52980@gmail.com';
+      const { profile, error } = await createProfile(email, name, isAdmin);
+      console.log('createProfile →', { profile, error });
+      if (error) {
+        console.warn('createProfile warning:', error);
+      }
+
+      // 3) Make sure local Neon user exists too
+      let local = await NeonDB.getUserByEmail(email);
+      if (!local) {
+        local = await NeonDB.createUser(email, name, isAdmin);
+      }
+
+      // 4) Load balances and set context
+      const balances = await NeonDB.getUserBalances(local.id);
+      setUser({ ...local, balances });
+      localStorage.setItem('nova_user_email', local.email);
+      await loadUserData(local.id);
 
       return true;
     } catch (e) {
@@ -636,11 +647,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async (): Promise<void> => {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // ignore
+    }
     setUser(null);
     setTransactions([]);
     localStorage.removeItem('nova_user_email');
   };
 
+  /* ────────────── Data mutations ────────────── */
   const updateBalance = async (
     coinSymbol: string,
     amount: number
@@ -648,17 +665,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     try {
       await NeonDB.updateUserBalance(user.id, coinSymbol, amount);
-      setUser((prev) =>
-        prev
-          ? {
-              ...prev,
-              balances: {
-                ...prev.balances,
-                [coinSymbol]: (prev.balances[coinSymbol] || 0) + amount,
-              },
-            }
-          : prev
-      );
+      // IMPORTANT: do not do local math; pull fresh from Neon
+      await refreshUserData(user.id);
     } catch (error) {
       console.error('Error updating balance:', error);
       throw error;
@@ -704,8 +712,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setLanguage = (lang: string) => {
     setLanguageState(lang);
     localStorage.setItem('nova_lang', lang);
-    // Some builds don’t export setUserLanguage; guard it at runtime to satisfy TS and avoid crashes.
-    const maybeSetLang = (NeonDB as unknown as { setUserLanguage?: (id: string, l: string) => Promise<void> }).setUserLanguage;
+    const maybeSetLang = (NeonDB as unknown as {
+      setUserLanguage?: (id: string, l: string) => Promise<void>;
+    }).setUserLanguage;
     if (user?.id && typeof maybeSetLang === 'function') {
       maybeSetLang(user.id, lang).catch(() => {});
     }
@@ -719,7 +728,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── Live price polling ───────────────────────────────────────────────────
+  /* ────────────── Live price polling ────────────── */
   const pollMs = Number(import.meta.env.VITE_PRICE_POLL_MS ?? 15000);
   const persistMs = Number(import.meta.env.VITE_PRICE_PERSIST_MS ?? 60000);
   const lastPersistRef = useRef(0);
@@ -755,7 +764,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (!tkr) return c;
             const price = Number(tkr.lastPrice);
             const change24h = Number(tkr.priceChangePercent);
-            const volume = toNum(tkr.quoteVolume || tkr.volume, c.volume ?? 0);
+            const volume = toNum(tkr.quoteVolume || tkr.volume, (c as any).volume ?? 0);
             return { ...c, price, change24h, volume, updated_at: nowIso } as any;
           })
         );
@@ -779,11 +788,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     pull();
     timer = window.setInterval(pull, pollMs);
-    // ✅ Explicitly return void cleanup to satisfy React types
     return () => {
-      if (timer !== undefined) {
-        window.clearInterval(timer);
-      }
+      if (timer !== undefined) window.clearInterval(timer);
     };
   }, [coins.length, persistMs, pollMs]);
 
@@ -804,6 +810,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addTransaction,
         updateCoinPrice,
         refreshData,
+        // NEW: make refresher available to AdminPage and others
+        refreshUserData,
       }}
     >
       {children}

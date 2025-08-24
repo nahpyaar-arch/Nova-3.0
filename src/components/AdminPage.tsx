@@ -6,6 +6,8 @@ import {
 import { useApp } from '../contexts/AppContext';
 import { NeonDB } from '../lib/neon';
 
+// NOTE: Removed duplicate `useApp` import and the top-level `onApprove` that used hooks outside a component.
+
 type Tab = 'overview' | 'moon' | 'deposits' | 'withdrawals' | 'settings';
 
 type MoonSchedule = {
@@ -16,7 +18,7 @@ type MoonSchedule = {
 
 export default function AdminPage() {
   // only pull what we actually use to avoid TS/ESLint “never read” noise
-  const { user, coins, updateCoinPrice } = useApp();
+  const { user, coins, updateCoinPrice, refreshUserData } = useApp();
 
   // Works with either shape (DB uses is_admin; some older code used isAdmin)
   const isAdminFromUser = !!(user?.is_admin ?? (user as any)?.isAdmin);
@@ -65,7 +67,6 @@ export default function AdminPage() {
   const safePrice = Number(moonCoin?.price ?? 0);
 
   // Accept both legacy `change24h` (camel) and current `change_24h` (snake)
-  // Casting to any on the first access avoids TS error while staying safe.
   const change = Number((moonCoin as any)?.change24h ?? (moonCoin as any)?.change_24h ?? 0);
 
   async function loadQueues() {
@@ -116,6 +117,10 @@ export default function AdminPage() {
       } else {
         await NeonDB.rejectDeposit(tx.id);
       }
+
+      // pull fresh balances & transactions for the affected user
+      await refreshUserData?.(tx.user_id);
+
     } catch (e) {
       console.error('Failed to update deposit:', e);
       alert('Failed to update deposit. See console for details.');
@@ -138,6 +143,10 @@ export default function AdminPage() {
       } else {
         await NeonDB.rejectWithdrawal(tx.id);
       }
+
+      // pull fresh balances & transactions for the affected user
+      await refreshUserData?.(tx.user_id);
+
     } catch (e) {
       console.error('Failed to update withdrawal:', e);
       alert('Failed to update withdrawal. See console for details.');

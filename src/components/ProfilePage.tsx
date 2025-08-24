@@ -1,31 +1,45 @@
 // src/components/ProfilePage.tsx
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-
-import { useState, useEffect, type FormEvent } from 'react';
-
+import { useEffect, useState, type FormEvent } from 'react';
 import { User, Mail, Globe, Bell, Shield, LogOut } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { supabase } from '../lib/supabase';
+import { pingSupabase, supabase } from '../lib/supabase';
 
 export default function ProfilePage() {
   const { user, login, register, logout, language, setLanguage, refreshData, t } = useApp();
+
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // 🔎 optional: confirm Supabase wiring (remove later if you like)
+  // Quick connectivity check to Supabase
   useEffect(() => {
     (async () => {
-      try {
-        const { data, error } = await supabase.from('profiles').select('*').limit(1);
-        console.log('Supabase test →', { data, error });
-      } catch (e) {
-        console.error('Supabase test failed:', e);
-      }
+      const { data, error } = await pingSupabase();
+      console.log('supabase ping →', { rows: data?.length ?? 0, error });
     })();
   }, []);
+
+  // DEV: write a quick test row to confirm insert policy works
+  const insertTestProfile = async () => {
+    const testEmail = `dev+${Date.now()}@example.com`;
+    const { data, error } = await supabase
+      .from('profiles')
+      .insert([
+        {
+          email: testEmail,
+          name: 'Dev Test',
+          is_admin: false,
+          language: 'en',
+        },
+      ])
+      .select('*');
+
+    console.log('insert test →', { data, error });
+    if (error) alert(`Insert failed: ${error.message}`);
+    else alert(`Inserted: ${data?.[0]?.email || testEmail}`);
+  };
 
   const LANGUAGES = [
     { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -151,9 +165,22 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-900 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-4">{t('profile.title')}</h1>
-          <p className="text-gray-400">Manage your account settings and preferences</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-1">{t('profile.title')}</h1>
+            <p className="text-gray-400">Manage your account settings and preferences</p>
+          </div>
+
+          {/* DEV-only button for testing insert */}
+          {import.meta.env.DEV && (
+            <button
+              onClick={insertTestProfile}
+              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+              title="Insert a test row into supabase.public.profiles"
+            >
+              DEV: Insert test profile
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -1,15 +1,25 @@
 // src/lib/neon.ts
 import { neon } from '@neondatabase/serverless';
 
-// Get database URL from environment (Vite exposes VITE_* only)
+/**
+ * IMPORTANT:
+ * Put your connection string in Vite env:
+ *   VITE_DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
+ * Never hardcode it here.
+ */
+
+// ───────────────────────────────────────────────────────────
+// SQL client
+// ───────────────────────────────────────────────────────────
 const databaseUrl = import.meta.env.VITE_DATABASE_URL;
 
+// Vite exposes only VITE_* keys to the client bundle
 if (!databaseUrl) {
-  console.warn('No VITE_DATABASE_URL found; using mock data');
+  console.warn('No VITE_DATABASE_URL found; the app will use mock data for DB reads.');
 }
 
-// Create Neon SQL client (tagged template)
-export const sql = databaseUrl ? neon(databaseUrl) : null;
+// Single, canonical SQL export (no redeclare!)
+export const sql = databaseUrl ? neon(databaseUrl) : null as any;
 
 // ───────────────────────────────────────────────────────────
 // Types
@@ -24,7 +34,6 @@ export interface Profile {
   updated_at: string;
 }
 
-// src/lib/neon.ts
 export interface Coin {
   id: string;
   symbol: string;
@@ -39,11 +48,28 @@ export interface Coin {
   updated_at: string;
 }
 
-// 👇 Add this normalizer (keeps UI camelCase while tolerating DB/mock snake_case)
+export interface Transaction {
+  id: string;
+  user_id: string;
+  type: 'deposit' | 'withdraw' | 'trade' | 'exchange';
+  coin_symbol: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected' | 'completed' | 'failed';
+  details: any;
+  created_at: string;
+  updated_at: string;
+}
+
+// ───────────────────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────────────────
+const toNum = (v: any, d = 0) =>
+  v === null || v === undefined || v === '' ? d : Number(v);
+
 export function normalizeCoin(row: any): Coin {
   const now = new Date().toISOString();
   return {
-    id: row.id ?? crypto?.randomUUID?.() ?? String(Math.random()),
+    id: row.id ?? (globalThis.crypto?.randomUUID?.() ?? String(Math.random())),
     symbol: row.symbol,
     name: row.name,
     price: Number(row.price ?? 0),
@@ -57,29 +83,28 @@ export function normalizeCoin(row: any): Coin {
   };
 }
 
-
-
-export interface Transaction {
-  id: string;
-  user_id: string;
-  type: 'deposit' | 'withdraw' | 'trade' | 'exchange';
-  coin_symbol: string;
-  amount: number;
-  status: 'pending' | 'approved' | 'rejected' | 'completed' | 'failed';
-  details: any;
-  created_at: string;
-  updated_at: string;
+function mockCoins(): Coin[] {
+  const now = new Date().toISOString();
+  const raw = [
+    { id: '1',  symbol: 'BTC',   name: 'Bitcoin',    price: 43250.0, change_24h: 2.45, volume: 28500000000, market_cap: 847000000000, is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '2',  symbol: 'ETH',   name: 'Ethereum',   price: 2650.0,  change_24h: 1.85, volume: 15200000000, market_cap: 318000000000, is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '3',  symbol: 'BNB',   name: 'BNB',        price: 315.5,   change_24h: 0.95, volume: 1800000000,  market_cap: 47200000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '4',  symbol: 'USDT',  name: 'Tether',     price: 1.0,     change_24h: 0.01, volume: 45000000000, market_cap: 95000000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '5',  symbol: 'SOL',   name: 'Solana',     price: 98.75,   change_24h: 3.25, volume: 2100000000,  market_cap: 42800000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '6',  symbol: 'ADA',   name: 'Cardano',    price: 0.485,   change_24h: -1.25,volume: 580000000,   market_cap: 17200000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '7',  symbol: 'AVAX',  name: 'Avalanche',  price: 36.8,    change_24h: 2.15, volume: 420000000,   market_cap: 13500000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '8',  symbol: 'DOT',   name: 'Polkadot',   price: 7.25,    change_24h: -0.85,volume: 180000000,   market_cap: 9200000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '9',  symbol: 'MATIC', name: 'Polygon',    price: 0.825,   change_24h: 1.45, volume: 320000000,   market_cap: 7800000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
+    { id: '10', symbol: 'MOON',  name: 'Moon Token', price: 0.0125,  change_24h: 5.75, volume: 15000000,    market_cap: 125000000,    is_custom: true,  is_active: true, created_at: now, updated_at: now },
+  ];
+  return raw.map(normalizeCoin);
 }
-
-// helpers
-const toNum = (v: any, d = 0) =>
-  v === null || v === undefined || v === '' ? d : Number(v);
 
 // ───────────────────────────────────────────────────────────
 // DB API
 // ───────────────────────────────────────────────────────────
 export class NeonDB {
-  // low-level "unsafe" escape hatch (still uses template tag)
+  // low-level escape hatch
   static async query(queryText: string, params: any[] = []) {
     if (!sql) throw new Error('Database not connected');
     return await (sql as any)([queryText] as any, ...params);
@@ -133,7 +158,6 @@ export class NeonDB {
   }
 
   // ── Admin actions: DEPOSIT queue ─────────────────────────
-  // Approve a pending DEPOSIT -> credit balance + mark completed
   static async approveDeposit(txId: string): Promise<void> {
     if (!sql) throw new Error('Database not connected');
     const client = sql as any;
@@ -160,19 +184,16 @@ export class NeonDB {
     `;
   }
 
-  // Reject a pending DEPOSIT -> no balance change, just rejected
   static async rejectDeposit(txId: string): Promise<void> {
     await NeonDB.updateTransactionStatus(txId, 'rejected');
   }
 
   // ── Admin actions: WITHDRAW queue ────────────────────────
-  // Approve a pending WITHDRAWAL -> deduct funds (locked first), then mark completed
   static async approveWithdrawal(txId: string): Promise<void> {
     if (!sql) throw new Error('Database not connected');
     const client = sql as any;
     const now = new Date().toISOString();
 
-    // 1) fetch tx
     const txRows = await client`
       SELECT id, user_id, coin_symbol, amount, status, type
       FROM transactions
@@ -187,7 +208,6 @@ export class NeonDB {
     const symbol = tx.coin_symbol as string;
     const amount = Number(tx.amount);
 
-    // 2) read balances
     const balRows = await client`
       SELECT balance, locked_balance
       FROM user_balances
@@ -197,7 +217,6 @@ export class NeonDB {
     const balance = toNum(current.balance, 0);
     const locked  = toNum(current.locked_balance, 0);
 
-    // 3) deduct from locked first, else from free balance
     if (locked >= amount) {
       await client`
         UPDATE user_balances
@@ -216,7 +235,6 @@ export class NeonDB {
       throw new Error('Insufficient funds to approve withdrawal');
     }
 
-    // 4) mark tx completed
     await client`
       UPDATE transactions
       SET status = 'completed', updated_at = ${now}
@@ -224,7 +242,6 @@ export class NeonDB {
     `;
   }
 
-  // Reject a pending WITHDRAWAL -> refund (credit back) + mark rejected
   static async rejectWithdrawal(txId: string): Promise<void> {
     if (!sql) throw new Error('Database not connected');
     const client = sql as any;
@@ -244,7 +261,6 @@ export class NeonDB {
     const symbol = tx.coin_symbol as string;
     const amount = Number(tx.amount);
 
-    // refund to free balance
     await client`
       INSERT INTO user_balances (id, user_id, coin_symbol, balance, locked_balance, created_at, updated_at)
       VALUES (${crypto.randomUUID()}, ${userId}, ${symbol}, ${amount}, 0, ${now}, ${now})
@@ -254,7 +270,6 @@ export class NeonDB {
         updated_at = ${now}
     `;
 
-    // mark as rejected
     await client`
       UPDATE transactions
       SET status = 'rejected', updated_at = ${now}
@@ -302,40 +317,21 @@ export class NeonDB {
 
   // ── Coin operations ──────────────────────────────────────
   static async getCoins(): Promise<Coin[]> {
-  // dev / no-DB path: use mock then normalize
-  if (!sql) {
-    const now = new Date().toISOString();
-    const raw = [
-      { id: '1',  symbol: 'BTC',   name: 'Bitcoin',    price: 43250.0, change_24h: 2.45, volume: 28500000000, market_cap: 847000000000, is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '2',  symbol: 'ETH',   name: 'Ethereum',   price: 2650.0,  change_24h: 1.85, volume: 15200000000, market_cap: 318000000000, is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '3',  symbol: 'BNB',   name: 'BNB',        price: 315.5,   change_24h: 0.95, volume: 1800000000,  market_cap: 47200000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '4',  symbol: 'USDT',  name: 'Tether',     price: 1.0,     change_24h: 0.01, volume: 45000000000, market_cap: 95000000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '5',  symbol: 'SOL',   name: 'Solana',     price: 98.75,   change_24h: 3.25, volume: 2100000000,  market_cap: 42800000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '6',  symbol: 'ADA',   name: 'Cardano',    price: 0.485,   change_24h: -1.25,volume: 580000000,   market_cap: 17200000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '7',  symbol: 'AVAX',  name: 'Avalanche',  price: 36.8,    change_24h: 2.15, volume: 420000000,   market_cap: 13500000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '8',  symbol: 'DOT',   name: 'Polkadot',   price: 7.25,    change_24h: -0.85,volume: 180000000,   market_cap: 9200000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '9',  symbol: 'MATIC', name: 'Polygon',    price: 0.825,   change_24h: 1.45, volume: 320000000,   market_cap: 7800000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
-      { id: '10', symbol: 'MOON',  name: 'Moon Token', price: 0.0125,  change_24h: 5.75, volume: 15000000,    market_cap: 125000000,    is_custom: true,  is_active: true, created_at: now, updated_at: now },
-    ];
-    return raw.map(normalizeCoin); // ← turn snake to camel for UI
-  }
+    if (!sql) return mockCoins();
 
-  // DB path: normalize rows too
-  try {
-    const rows = (await (sql as any)`
-      SELECT *
-      FROM coins
-      WHERE is_active = true
-      ORDER BY market_cap DESC
-    `) as any[];
-    return rows.map(normalizeCoin);
-  } catch (error) {
-    console.error('Error fetching coins from database:', error);
-    // fall back to mock (normalized)
-    return (await this.getCoins());
+    try {
+      const rows = (await (sql as any)`
+        SELECT *
+        FROM coins
+        WHERE is_active = true
+        ORDER BY market_cap DESC
+      `) as any[];
+      return rows.map(normalizeCoin);
+    } catch (error) {
+      console.error('Error fetching coins from database:', error);
+      return mockCoins(); // graceful fallback, not recursive
+    }
   }
-}
-
 
   static async initializeCoins(): Promise<void> {
     if (!sql) return;
@@ -349,18 +345,18 @@ export class NeonDB {
         const now = new Date().toISOString();
 
         await (sql as any)`
-          INSERT INTO coins (id, symbol, name, price, change_24h, volume, market_cap, is_custom, created_at, updated_at)
+          INSERT INTO coins (id, symbol, name, price, change_24h, volume, market_cap, is_custom, is_active, created_at, updated_at)
           VALUES
-          (${crypto.randomUUID()}, 'BTC', 'Bitcoin', 43250.00,  2.45, 28500000000, 847000000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'ETH', 'Ethereum', 2650.00,  1.85, 15200000000, 318000000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'BNB', 'BNB',       315.50,  0.95,  1800000000,  47200000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'USDT','Tether',      1.00,  0.01, 45000000000,  95000000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'SOL', 'Solana',     98.75,  3.25,  2100000000,  42800000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'ADA', 'Cardano',     0.485, -1.25,  580000000,  17200000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'AVAX','Avalanche',  36.80,  2.15,   420000000,  13500000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'DOT', 'Polkadot',    7.25, -0.85,   180000000,   9200000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'MATIC','Polygon',    0.825, 1.45,   320000000,   7800000000, false, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'MOON','Moon Token',  0.0125,5.75,    15000000,    125000000,  true, ${now}, ${now})
+          (${crypto.randomUUID()}, 'BTC', 'Bitcoin', 43250.00,  2.45, 28500000000, 847000000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'ETH', 'Ethereum', 2650.00,  1.85, 15200000000, 318000000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'BNB', 'BNB',       315.50,  0.95,  1800000000,  47200000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'USDT','Tether',      1.00,  0.01, 45000000000,  95000000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'SOL', 'Solana',     98.75,  3.25,  2100000000,  42800000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'ADA', 'Cardano',     0.485, -1.25,  580000000,  17200000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'AVAX','Avalanche',  36.80,  2.15,   420000000,  13500000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'DOT', 'Polkadot',    7.25, -0.85,   180000000,   9200000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'MATIC','Polygon',    0.825, 1.45,   320000000,   7800000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'MOON','Moon Token',  0.0125,5.75,    15000000,    125000000,  true, true, ${now}, ${now})
         `;
 
         console.log('Coins data initialized successfully');
@@ -390,9 +386,7 @@ export class NeonDB {
 
   // ── Balances ─────────────────────────────────────────────
   static async getUserBalances(userId: string): Promise<Record<string, number>> {
-    if (!sql) {
-      return { USDT: 10000, BTC: 0.1, ETH: 1.5, MOON: 1000 };
-    }
+    if (!sql) return { USDT: 10000, BTC: 0.1, ETH: 1.5, MOON: 1000 };
 
     const result = (await (sql as any)`
       SELECT coin_symbol, balance FROM user_balances WHERE user_id = ${userId}
@@ -457,6 +451,46 @@ export class NeonDB {
       ORDER BY created_at DESC
     `) as any as Transaction[];
   }
+}
+
+// ───────────────────────────────────────────────────────────
+// (Optional) Approve a deposit in a different table naming
+// If you don’t use a `deposits` table, you can remove this helper.
+// ───────────────────────────────────────────────────────────
+export async function approveDepositInNeon(depositId: string, adminId: string) {
+  if (!sql) throw new Error('Database not connected');
+  const client = sql as any;
+
+  const depRows = await client<{
+    user_id: string; coin: string; amount: string;
+  }[]>`
+    update deposits
+       set status = 'approved',
+           approved_at = now(),
+           approved_by = ${adminId}
+     where id = ${depositId}
+       and status = 'pending'
+    returning user_id, coin, amount
+  `;
+  if (depRows.length === 0) {
+    throw new Error('Deposit not found or already processed');
+  }
+  const dep = depRows[0];
+
+  await client`
+    insert into balances (user_id, coin, amount)
+    values (${dep.user_id}, ${dep.coin}, ${dep.amount})
+    on conflict (user_id, coin)
+    do update set amount = balances.amount + excluded.amount
+  `;
+
+  await client`
+    insert into transactions (user_id, type, coin, amount, meta)
+    values (${dep.user_id}, 'deposit', ${dep.coin}, ${dep.amount},
+            jsonb_build_object('deposit_id', ${depositId}))
+  `;
+
+  return dep;
 }
 
 // ───────────────────────────────────────────────────────────
@@ -542,7 +576,6 @@ export async function initializeDatabase() {
   }
 }
 
-// Simple ping helper to verify connection
 export async function pingDB() {
   if (!sql) return { ok: false, note: 'no sql client' as const };
   try {
