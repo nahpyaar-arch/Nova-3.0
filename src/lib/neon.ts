@@ -3,23 +3,41 @@ import { neon } from '@neondatabase/serverless';
 
 /**
  * IMPORTANT:
- * Put your connection string in Vite env:
- *   VITE_DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
- * Never hardcode it here.
+ * Put your connection string in env:
+ *  - For the app (Vite): VITE_DATABASE_URL
+ *  - For Netlify Functions: VITE_DATABASE_URL (or DATABASE_URL)
  */
 
-// ───────────────────────────────────────────────────────────
-// SQL client
-// ───────────────────────────────────────────────────────────
-const databaseUrl = import.meta.env.VITE_DATABASE_URL;
-
-// Vite exposes only VITE_* keys to the client bundle
-if (!databaseUrl) {
-  console.warn('No VITE_DATABASE_URL found; the app will use mock data for DB reads.');
+// --- Resolve DB URL safely in both environments (Node & browser) ---
+function resolveDbUrl(): string | undefined {
+  // Node / Netlify Functions: prefer process.env
+  if (typeof process !== 'undefined' && (process as any).env) {
+    return (
+      process.env.VITE_DATABASE_URL ||
+      process.env.DATABASE_URL ||
+      undefined
+    );
+  }
+  // Browser (Vite): read from import.meta.env
+  try {
+    // optional chaining protects on older bundlers
+    return (import.meta as any)?.env?.VITE_DATABASE_URL;
+  } catch {
+    return undefined;
+  }
 }
 
-// Single, canonical SQL export (no redeclare!)
-export const sql = (databaseUrl ? neon(databaseUrl) : null) as any;
+const databaseUrl = resolveDbUrl();
+
+// Single, canonical SQL export
+export const sql = databaseUrl ? neon(databaseUrl) : (null as any);
+
+// Warn in the browser if not configured
+if (!databaseUrl) {
+  console.warn(
+    'No VITE_DATABASE_URL / DATABASE_URL found; using mock data for DB reads.'
+  );
+}
 
 // ───────────────────────────────────────────────────────────
 // Types
