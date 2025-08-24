@@ -558,30 +558,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /* ────────────── Auth: Supabase + Neon profile ────────────── */
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // 1) Supabase Auth
-const { data, error: authError } =
-  await supabase.auth.signInWithPassword({ email, password });
-if (authError) {
-  console.error('Auth signIn failed:', authError);
+// 1) Supabase auth
+const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+if (error) {
+  console.error('Auth signIn failed:', error);
   return false;
 }
 
-const user = data.user;
-
-// 2) Sync profile into Neon via Netlify Function
+// 2) Upsert profile on the server (Netlify Function)
 try {
+  const user = data.user!;
   await fetch('/.netlify/functions/upsert-profile', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      id: user?.id,
-      email: user?.email,
-      name: user?.email?.split('@')[0], // or form value
+      id: user.id,
+      email: user.email,
+      // derive a safe name without relying on an undefined form variable
+      name:
+        (user.user_metadata as any)?.name ??
+        (user.user_metadata as any)?.full_name ??
+        (user.email ? user.email.split('@')[0] : 'user'),
     }),
   });
 } catch (err) {
   console.error('Profile sync failed:', err);
 }
+
 
 
       // 2) Supabase profile (for is_admin/name, etc.)
