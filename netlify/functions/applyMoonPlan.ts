@@ -16,7 +16,9 @@ export async function handler() {
     }
     console.log('Has DB URL?', !!process.env.VITE_DATABASE_URL);
     // today (UTC) as YYYY-MM-DD
-    const today = new Date().toISOString().slice(0, 10);
+    const fmtJST = new Intl.DateTimeFormat('en-CA',{ timeZone:'Asia/Tokyo', year:'numeric', month:'2-digit', day:'2-digit' });
+const today = fmtJST.format(new Date()); // YYYY-MM-DD in JST
+
 
     // 1) fetch plan
     const plans = await NeonDB.listMoonPlans(today, today);
