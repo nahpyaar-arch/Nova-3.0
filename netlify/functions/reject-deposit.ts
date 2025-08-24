@@ -10,11 +10,13 @@ export const handler: Handler = async (event) => {
     const { id } = JSON.parse(event.body || '{}');
     if (!id) return { statusCode: 400, body: 'Missing id' };
 
-    await sql`
+    const rows = await sql`
       UPDATE transactions
-      SET status = 'rejected'
-      WHERE id = ${id} AND type = 'deposit' AND status = 'pending';
+      SET status = 'rejected', updated_at = NOW()
+      WHERE id = ${id} AND type = 'deposit' AND status = 'pending'
+      RETURNING id;
     `;
+    if (rows.length === 0) return { statusCode: 404, body: 'Not found or not pending' };
 
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (e: any) {

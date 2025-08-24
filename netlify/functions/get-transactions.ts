@@ -5,15 +5,15 @@ export const handler: Handler = async (event) => {
   try {
     const dbUrl = process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
     if (!dbUrl) return { statusCode: 500, body: 'DATABASE_URL not set' };
-
     const sql = neon(dbUrl);
-    const type = (event.queryStringParameters?.type || '').toLowerCase();
-    const status = (event.queryStringParameters?.status || '').toLowerCase();
+
+    const type = (event.queryStringParameters?.type || '').toLowerCase();     // deposit | withdraw | ''
+    const status = (event.queryStringParameters?.status || '').toLowerCase(); // pending | approved | ...
 
     const rows = await sql`
       SELECT id, user_id, coin_symbol, amount, type, status, details, created_at
       FROM transactions
-      WHERE (${type} = '' OR type = ${type})
+      WHERE (${type} = ''  OR type   = ${type})
         AND (${status} = '' OR status = ${status})
       ORDER BY created_at DESC
       LIMIT 200;

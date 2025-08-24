@@ -10,23 +10,22 @@ export const handler: Handler = async (event) => {
     const { id } = JSON.parse(event.body || '{}');
     if (!id) return { statusCode: 400, body: 'Missing id' };
 
-    // 1) approve pending deposit, get details
+    // Move to approved and credit balance atomically
     const rows = await sql`
       UPDATE transactions
-      SET status = 'approved'
+      SET status = 'approved', updated_at = NOW()
       WHERE id = ${id} AND type = 'deposit' AND status = 'pending'
-      RETURNING user_id, coin_symbol, amount;
+      RETURNING user_id, amount, coin_symbol;
     `;
     if (rows.length === 0) return { statusCode: 404, body: 'Not found or not pending' };
 
-    const { user_id, coin_symbol, amount } = rows[0];
+    const { user_id, amount, coin_symbol } = rows[0];
 
-    // 2) credit balance (upsert)
     await sql`
-      INSERT INTO user_balances (user_id, coin_symbol, balance)
-      VALUES (${user_id}, ${coin_symbol}, ${Number(amount)})
+      INSERT INTO user_balances (id, user_id, coin_symbol, balance, locked_balance, created_at, updated_at)
+      VALUES (${crypto.randomUUID()}, ${user_id}, ${coin_symbol}, ${Number(amount)}, 0, NOW(), NOW())
       ON CONFLICT (user_id, coin_symbol)
-      DO UPDATE SET balance = user_balances.balance + EXCLUDED.balance;
+      DO UPDATE SET balance = user_balances.balance + EXCLUDED.balance, updated_at = NOW();
     `;
 
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };

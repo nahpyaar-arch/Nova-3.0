@@ -10,33 +10,61 @@ export const handler: Handler = async (event) => {
     const { id } = JSON.parse(event.body || '{}');
     if (!id) return { statusCode: 400, body: 'Missing id' };
 
-    // 1) approve pending withdraw
-    const rows = await sql`
-      UPDATE transactions
-      SET status = 'approved'
-      WHERE id = ${id} AND type = 'withdraw' AND status = 'pending'
-      RETURNING user_id, coin_symbol, amount;
+    // Fetch the transaction
+    const txRows = await sql`
+      SELECT id, user_id, coin_symbol, amount, status, type
+      FROM transactions
+      WHERE id = ${id}
+      LIMIT 1
     `;
-    if (rows.length === 0) return { statusCode: 404, body: 'Not found or not pending' };
+    if (txRows.length === 0) return { statusCode: 404, body: 'Transaction not found' };
 
-    const { user_id, coin_symbol, amount } = rows[0];
-
-    // 2) debit balance (allow negative or enforce check)
-    // Enforce "enough balance": if not enough, revert and error.
-    const bal = await sql`
-      SELECT balance FROM user_balances WHERE user_id=${user_id} AND coin_symbol=${coin_symbol};
-    `;
-    const current = Number(bal[0]?.balance ?? 0);
-    if (current < Number(amount)) {
-      // revert status back to pending so admin can decide
-      await sql`UPDATE transactions SET status='pending' WHERE id=${id};`;
-      return { statusCode: 400, body: 'Insufficient balance for withdrawal' };
+    const tx: any = txRows[0];
+    if (tx.type !== 'withdraw') return { statusCode: 400, body: 'Not a withdrawal' };
+    if (tx.status !== 'pending') {
+      // already processed
+      return { statusCode: 200, body: JSON.stringify({ ok: true, note: 'already processed' }) };
     }
 
+    const userId = String(tx.user_id);
+    const symbol = String(tx.coin_symbol);
+    const amount = Number(tx.amount);
+
+    // Check balances
+    const balRows = await sql`
+      SELECT balance, locked_balance
+      FROM user_balances
+      WHERE user_id = ${userId} AND coin_symbol = ${symbol}
+      LIMIT 1
+    `;
+    const b = balRows[0] ?? { balance: 0, locked_balance: 0 };
+    const balance = Number(b.balance ?? 0);
+    const locked  = Number(b.locked_balance ?? 0);
+
+    // Prefer deducting from locked; fall back to available balance
+    if (locked >= amount) {
+      await sql`
+        UPDATE user_balances
+        SET locked_balance = locked_balance - ${amount},
+            updated_at     = NOW()
+        WHERE user_id = ${userId} AND coin_symbol = ${symbol}
+      `;
+    } else if (balance >= amount) {
+      await sql`
+        UPDATE user_balances
+        SET balance   = balance - ${amount},
+            updated_at = NOW()
+        WHERE user_id = ${userId} AND coin_symbol = ${symbol}
+      `;
+    } else {
+      return { statusCode: 400, body: 'Insufficient funds' };
+    }
+
+    // Mark transaction done
     await sql`
-      UPDATE user_balances
-      SET balance = balance - ${Number(amount)}
-      WHERE user_id = ${user_id} AND coin_symbol = ${coin_symbol};
+      UPDATE transactions
+      SET status = 'completed', updated_at = NOW()
+      WHERE id = ${id}
     `;
 
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };

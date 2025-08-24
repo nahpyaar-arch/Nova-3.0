@@ -40,6 +40,21 @@ const parseYmdToLocal = (ymd: string) => {
   return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
 };
 
+// small helper for POSTs to functions
+async function postJson<T = any>(url: string, body: any): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return {} as T;
+  }
+}
+
 export default function AdminPage() {
   // only pull what we actually use
   const { user, coins, updateCoinPrice, refreshData } = useApp();
@@ -93,15 +108,18 @@ export default function AdminPage() {
   // Accept both legacy `change24h` (camel) and current `change_24h` (snake)
   const change = Number((moonCoin as any)?.change24h ?? (moonCoin as any)?.change_24h ?? 0);
 
+  // Load queues via Netlify Functions (no DB in the browser)
   async function loadQueues() {
     if (!isAllowed) return;
     try {
-      const [deps, wds] = await Promise.all([
-        NeonDB.getPendingTransactions('deposit'),
-        NeonDB.getPendingTransactions('withdraw'),
+      const [r1, r2] = await Promise.all([
+        fetch('/.netlify/functions/get-transactions?type=deposit&status=pending'),
+        fetch('/.netlify/functions/get-transactions?type=withdraw&status=pending'),
       ]);
-      setPendingDeposits(deps);
-      setPendingWithdrawals(wds);
+      const j1 = await r1.json().catch(() => ({}));
+      const j2 = await r2.json().catch(() => ({}));
+      setPendingDeposits(j1.transactions ?? []);
+      setPendingWithdrawals(j2.transactions ?? []);
     } catch (e) {
       console.error('Failed to load pending queues:', e);
     }
@@ -112,7 +130,7 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAllowed]);
 
-  // ---- MOON plan state & helpers (NOW USING NETLIFY FUNCTIONS) ------------
+  // ---- MOON plan state & helpers (Netlify Functions) -----------------------
   const [planDate, setPlanDate] = useState<string>('');     // YYYY-MM-DD
   const [planPct, setPlanPct] = useState<string>('');       // e.g. "20"
   const [planNote, setPlanNote] = useState<string>('');
@@ -151,10 +169,8 @@ export default function AdminPage() {
       return;
     }
     try {
-      await fetch('/.netlify/functions/upsert-moon-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: planDate, target_pct: pct, note: planNote }),
+      await postJson('/.netlify/functions/upsert-moon-plan', {
+        day: planDate, target_pct: pct, note: planNote,
       });
       await loadPlansWindow(planDate);
       setPlanPct('');
@@ -169,11 +185,7 @@ export default function AdminPage() {
   async function removePlan(day: string) {
     if (!confirm(`Delete plan for ${day}?`)) return;
     try {
-      await fetch('/.netlify/functions/delete-moon-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day }),
-      });
+      await postJson('/.netlify/functions/delete-moon-plan', { day });
       await loadPlansWindow(day);
     } catch (e) {
       console.error('Failed to delete plan:', e);
@@ -196,21 +208,10 @@ export default function AdminPage() {
     );
   };
 
-  // Handle DEPOSIT actions using server-side helpers
-  const handleDepositAction = async (
-    transactionId: string,
-    action: 'approve' | 'reject'
-  ) => {
-    const tx = pendingDeposits.find((x) => x.id === transactionId);
-    if (!tx) return;
-
+  // Approve/Reject DEPOSIT via functions
+  const handleDepositAction = async (transactionId: string, action: 'approve' | 'reject') => {
     try {
-      if (action === 'approve') {
-        await NeonDB.approveDeposit(tx.id);
-      } else {
-        await NeonDB.rejectDeposit(tx.id);
-      }
-      // refresh admin lists + local user view
+      await postJson(`/.netlify/functions/${action}-deposit`, { id: transactionId });
       await loadQueues();
       await refreshData();
     } catch (e) {
@@ -219,21 +220,10 @@ export default function AdminPage() {
     }
   };
 
-  // Handle WITHDRAWAL actions using server-side helpers
-  const handleWithdrawalAction = async (
-    transactionId: string,
-    action: 'approve' | 'reject'
-  ) => {
-    const tx = pendingWithdrawals.find((x) => x.id === transactionId);
-    if (!tx) return;
-
+  // Approve/Reject WITHDRAWAL via functions (make sure functions exist)
+  const handleWithdrawalAction = async (transactionId: string, action: 'approve' | 'reject') => {
     try {
-      if (action === 'approve') {
-        await NeonDB.approveWithdrawal(tx.id);
-      } else {
-        await NeonDB.rejectWithdrawal(tx.id);
-      }
-      // refresh admin lists + local user view
+      await postJson(`/.netlify/functions/${action}-withdraw`, { id: transactionId });
       await loadQueues();
       await refreshData();
     } catch (e) {
@@ -576,10 +566,16 @@ export default function AdminPage() {
                         {new Date(t.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                        <button onClick={() => handleDepositAction(t.id, 'approve')} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                        <button
+                          onClick={() => handleDepositAction(t.id, 'approve')}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                        >
                           <CheckCircle className="w-4 h-4 inline mr-1" /> Approve
                         </button>
-                        <button onClick={() => handleDepositAction(t.id, 'reject')} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                        <button
+                          onClick={() => handleDepositAction(t.id, 'reject')}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                        >
                           <XCircle className="w-4 h-4 inline mr-1" /> Reject
                         </button>
                       </td>
@@ -632,10 +628,16 @@ export default function AdminPage() {
                         {new Date(t.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                        <button onClick={() => handleWithdrawalAction(t.id, 'approve')} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                        <button
+                          onClick={() => handleWithdrawalAction(t.id, 'approve')}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                        >
                           <CheckCircle className="w-4 h-4 inline mr-1" /> Approve
                         </button>
-                        <button onClick={() => handleWithdrawalAction(t.id, 'reject')} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors">
+                        <button
+                          onClick={() => handleWithdrawalAction(t.id, 'reject')}
+                          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors"
+                        >
                           <XCircle className="w-4 h-4 inline mr-1" /> Reject
                         </button>
                       </td>

@@ -13,8 +13,9 @@ export const handler: Handler = async (event) => {
     }
 
     const rows = await sql`
-      INSERT INTO transactions (user_id, coin_symbol, amount, type, status, details)
-      VALUES (${user_id}, ${coin_symbol}, ${Number(amount)}, 'deposit', 'pending', ${JSON.stringify(details || {})})
+      INSERT INTO transactions (id, user_id, coin_symbol, amount, type, status, details, created_at, updated_at)
+      VALUES (${crypto.randomUUID()}, ${user_id}, ${coin_symbol}, ${Number(amount)},
+              'deposit', 'pending', ${JSON.stringify(details || {})}, NOW(), NOW())
       RETURNING id;
     `;
 
