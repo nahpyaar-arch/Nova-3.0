@@ -19,7 +19,7 @@ if (!databaseUrl) {
 }
 
 // Single, canonical SQL export (no redeclare!)
-export const sql = databaseUrl ? neon(databaseUrl) : null as any;
+export const sql = (databaseUrl ? neon(databaseUrl) : null) as any;
 
 // ───────────────────────────────────────────────────────────
 // Types
@@ -95,7 +95,8 @@ function mockCoins(): Coin[] {
     { id: '7',  symbol: 'AVAX',  name: 'Avalanche',  price: 36.8,    change_24h: 2.15, volume: 420000000,   market_cap: 13500000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
     { id: '8',  symbol: 'DOT',   name: 'Polkadot',   price: 7.25,    change_24h: -0.85,volume: 180000000,   market_cap: 9200000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
     { id: '9',  symbol: 'MATIC', name: 'Polygon',    price: 0.825,   change_24h: 1.45, volume: 320000000,   market_cap: 7800000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
-    { id: '10', symbol: 'MOON',  name: 'Moon Token', price: 0.0125,  change_24h: 5.75, volume: 15000000,    market_cap: 125000000,    is_custom: true,  is_active: true, created_at: now, updated_at: now },
+    // NOTE: keep mock in sync with DB semantics: is_custom = false for MOON
+    { id: '10', symbol: 'MOON',  name: 'Moon Token', price: 0.0125,  change_24h: 5.75, volume: 15000000,    market_cap: 125000000,    is_custom: false, is_active: true, created_at: now, updated_at: now },
   ];
   return raw.map(normalizeCoin);
 }
@@ -347,16 +348,16 @@ export class NeonDB {
         await (sql as any)`
           INSERT INTO coins (id, symbol, name, price, change_24h, volume, market_cap, is_custom, is_active, created_at, updated_at)
           VALUES
-          (${crypto.randomUUID()}, 'BTC', 'Bitcoin', 43250.00,  2.45, 28500000000, 847000000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'ETH', 'Ethereum', 2650.00,  1.85, 15200000000, 318000000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'BNB', 'BNB',       315.50,  0.95,  1800000000,  47200000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'USDT','Tether',      1.00,  0.01, 45000000000,  95000000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'SOL', 'Solana',     98.75,  3.25,  2100000000,  42800000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'ADA', 'Cardano',     0.485, -1.25,  580000000,  17200000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'AVAX','Avalanche',  36.80,  2.15,   420000000,  13500000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'DOT', 'Polkadot',    7.25, -0.85,   180000000,   9200000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'MATIC','Polygon',    0.825, 1.45,   320000000,   7800000000, false, true, ${now}, ${now}),
-          (${crypto.randomUUID()}, 'MOON','Moon Token',  0.0125,5.75,    15000000,    125000000,  true, true, ${now}, ${now})
+          (${crypto.randomUUID()}, 'BTC',   'Bitcoin',   43250.00,  2.45, 28500000000, 847000000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'ETH',   'Ethereum',   2650.00,  1.85, 15200000000, 318000000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'BNB',   'BNB',         315.50,  0.95,  1800000000,  47200000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'USDT',  'Tether',        1.00,  0.01, 45000000000,  95000000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'SOL',   'Solana',       98.75,  3.25,  2100000000,  42800000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'ADA',   'Cardano',       0.485, -1.25,  580000000,  17200000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'AVAX',  'Avalanche',    36.80,  2.15,   420000000,  13500000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'DOT',   'Polkadot',      7.25, -0.85,   180000000,   9200000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'MATIC', 'Polygon',       0.825,  1.45,   320000000,   7800000000, false, true, ${now}, ${now}),
+          (${crypto.randomUUID()}, 'MOON',  'Moon Token',    0.0125, 5.75,    15000000,    125000000, false, true, ${now}, ${now})
         `;
 
         console.log('Coins data initialized successfully');
@@ -366,17 +367,30 @@ export class NeonDB {
     }
   }
 
-  static async updateCoinPrice(symbol: string, price: number): Promise<void> {
+  // Update price (optionally change_24h) + record history
+  static async updateCoinPrice(
+    symbol: string,
+    price: number,
+    changePct?: number
+  ): Promise<void> {
     if (!sql) return;
 
     const now = new Date().toISOString();
     const client = sql as any;
 
-    await client`
-      UPDATE coins
-      SET price = ${price}, updated_at = ${now}
-      WHERE symbol = ${symbol}
-    `;
+    if (typeof changePct === 'number') {
+      await client`
+        UPDATE coins
+        SET price = ${price}, change_24h = ${changePct}, updated_at = ${now}
+        WHERE symbol = ${symbol}
+      `;
+    } else {
+      await client`
+        UPDATE coins
+        SET price = ${price}, updated_at = ${now}
+        WHERE symbol = ${symbol}
+      `;
+    }
 
     await client`
       INSERT INTO price_history (id, coin_symbol, price, timestamp)
@@ -450,6 +464,36 @@ export class NeonDB {
       WHERE user_id = ${userId}
       ORDER BY created_at DESC
     `) as any as Transaction[];
+  }
+
+  // ── MOON daily target plan helpers ───────────────────────
+  static async upsertMoonPlan(day: string, pct: number, note: string) {
+    if (!sql) return;
+    const client = sql as any;
+    await client`
+      INSERT INTO moon_plans (day, target_pct, note)
+      VALUES (${day}, ${pct}, ${note})
+      ON CONFLICT (day)
+      DO UPDATE SET target_pct = EXCLUDED.target_pct, note = EXCLUDED.note
+    `;
+  }
+
+  static async listMoonPlans(from: string, to: string): Promise<Array<{day: string; target_pct: number; note: string}>> {
+    if (!sql) return [];
+    const client = sql as any;
+    const rows = await client`
+      SELECT day::text AS day, target_pct::float AS target_pct, COALESCE(note,'') AS note
+      FROM moon_plans
+      WHERE day BETWEEN ${from} AND ${to}
+      ORDER BY day ASC
+    `;
+    return rows;
+  }
+
+  static async deleteMoonPlan(day: string) {
+    if (!sql) return;
+    const client = sql as any;
+    await client`DELETE FROM moon_plans WHERE day = ${day}`;
   }
 }
 
@@ -566,6 +610,15 @@ export async function initializeDatabase() {
         coin_symbol TEXT NOT NULL,
         price DECIMAL(20,8) NOT NULL,
         timestamp TIMESTAMPTZ DEFAULT NOW()
+      )
+    `;
+
+    // NEW: admin-set daily % targets for MOON
+    await (sql as any)`
+      CREATE TABLE IF NOT EXISTS moon_plans (
+        day DATE PRIMARY KEY,
+        target_pct DECIMAL(10,2) NOT NULL,
+        note TEXT DEFAULT ''
       )
     `;
 

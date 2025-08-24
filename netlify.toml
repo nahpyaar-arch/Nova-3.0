@@ -6,3 +6,6 @@
   from = "/*"
   to = "/index.html"
   status = 200
+[[scheduled]]
+  path = "/.netlify/functions/applyMoonPlan"
+  schedule = "0 0 * * *"

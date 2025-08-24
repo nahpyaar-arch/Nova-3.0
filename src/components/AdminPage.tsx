@@ -6,7 +6,7 @@ import {
 import { useApp } from '../contexts/AppContext';
 import { NeonDB } from '../lib/neon';
 
-// NOTE: Removed duplicate `useApp` import and the top-level `onApprove` that used hooks outside a component.
+// NOTE: No duplicate imports, no hooks outside components.
 
 type Tab = 'overview' | 'moon' | 'deposits' | 'withdrawals' | 'settings';
 
@@ -17,8 +17,8 @@ type MoonSchedule = {
 };
 
 export default function AdminPage() {
-  // only pull what we actually use to avoid TS/ESLint “never read” noise
-  const { user, coins, updateCoinPrice, refreshUserData } = useApp();
+  // only pull what we actually use
+  const { user, coins, updateCoinPrice, refreshData } = useApp();
 
   // Works with either shape (DB uses is_admin; some older code used isAdmin)
   const isAdminFromUser = !!(user?.is_admin ?? (user as any)?.isAdmin);
@@ -88,6 +88,61 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAllowed]);
 
+  // ---- MOON plan state & helpers ------------------------------------------
+  const [planDate, setPlanDate] = useState<string>('');     // YYYY-MM-DD
+  const [planPct, setPlanPct] = useState<string>('');       // e.g. "20"
+  const [planNote, setPlanNote] = useState<string>('');
+  const [plans, setPlans] = useState<Array<{day: string; target_pct: number; note: string}>>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+
+  async function loadPlansWindow(anchor = new Date()) {
+    const from = new Date(anchor); from.setDate(from.getDate() - 10);
+    const to = new Date(anchor);   to.setDate(to.getDate() + 10);
+    const toISO = (d: Date) => d.toISOString().slice(0,10);
+
+    try {
+      setLoadingPlans(true);
+      const data = await NeonDB.listMoonPlans(toISO(from), toISO(to));
+      setPlans(data);
+    } catch (e) {
+      console.error('Failed to load MOON plans:', e);
+    } finally {
+      setLoadingPlans(false);
+    }
+  }
+
+  useEffect(() => {
+    if (isAllowed) loadPlansWindow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAllowed]);
+
+  async function savePlan() {
+    if (!planDate || planPct === '') return;
+    const pct = Number(planPct);
+    if (!isFinite(pct)) return alert('Enter a valid percentage (e.g. 5, 20, -3)');
+    try {
+      await NeonDB.upsertMoonPlan(planDate, pct, planNote);
+      await loadPlansWindow(new Date(planDate));
+      setPlanPct('');
+      setPlanNote('');
+      alert(`Saved plan: ${planDate} → ${pct}%`);
+    } catch (e) {
+      console.error('Failed to save plan:', e);
+      alert('Failed to save plan. Check console.');
+    }
+  }
+
+  async function removePlan(day: string) {
+    if (!confirm(`Delete plan for ${day}?`)) return;
+    try {
+      await NeonDB.deleteMoonPlan(day);
+      await loadPlansWindow(new Date(day));
+    } catch (e) {
+      console.error('Failed to delete plan:', e);
+      alert('Failed to delete plan. Check console.');
+    }
+  }
+
   // ---- Actions -------------------------------------------------------------
   const handleMoonPriceUpdate = async () => {
     if (!moonPrice) return;
@@ -117,15 +172,12 @@ export default function AdminPage() {
       } else {
         await NeonDB.rejectDeposit(tx.id);
       }
-
-      // pull fresh balances & transactions for the affected user
-      await refreshUserData?.(tx.user_id);
-
+      // refresh admin lists + local user view
+      await loadQueues();
+      await refreshData();
     } catch (e) {
       console.error('Failed to update deposit:', e);
       alert('Failed to update deposit. See console for details.');
-    } finally {
-      await loadQueues();
     }
   };
 
@@ -143,15 +195,12 @@ export default function AdminPage() {
       } else {
         await NeonDB.rejectWithdrawal(tx.id);
       }
-
-      // pull fresh balances & transactions for the affected user
-      await refreshUserData?.(tx.user_id);
-
+      // refresh admin lists + local user view
+      await loadQueues();
+      await refreshData();
     } catch (e) {
       console.error('Failed to update withdrawal:', e);
       alert('Failed to update withdrawal. See console for details.');
-    } finally {
-      await loadQueues();
     }
   };
 
@@ -161,7 +210,7 @@ export default function AdminPage() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white mb-3">Access Denied</h2>
-          <p className="text-gray-400 mb-6">You need administrator privileges to access this page.</p>
+        <p className="text-gray-400 mb-6">You need administrator privileges to access this page.</p>
           <button
             onClick={recheckAdmin}
             disabled={checkingAdmin}
@@ -263,6 +312,7 @@ export default function AdminPage() {
         {/* MOON Control */}
         {activeTab === 'moon' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Manual price card */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
               <h2 className="text-xl font-bold text-white mb-6">Manual MOON Price Control</h2>
               <div className="space-y-4">
@@ -299,6 +349,7 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {/* Quick scheduler demo (kept) */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
               <h2 className="text-xl font-bold text-white mb-6">Schedule Price Changes</h2>
               <div className="space-y-4">
@@ -357,6 +408,101 @@ export default function AdminPage() {
                 >
                   Schedule Price Change
                 </button>
+              </div>
+            </div>
+
+            {/* NEW: MOON Daily Target Planner */}
+            <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 lg:col-span-2">
+              <h2 className="text-xl font-bold text-white mb-6">MOON Daily Target Planner</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Date (JST)</label>
+                  <input
+                    type="date"
+                    value={planDate}
+                    onChange={(e) => setPlanDate(e.target.value)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">% Target (e.g. 20 = +20%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={planPct}
+                    onChange={(e) => setPlanPct(e.target.value)}
+                    placeholder="e.g. 20"
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Note (optional)</label>
+                  <input
+                    type="text"
+                    value={planNote}
+                    onChange={(e) => setPlanNote(e.target.value)}
+                    placeholder="reason / campaign"
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={savePlan}
+                  disabled={!planDate || planPct === ''}
+                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white disabled:bg-gray-600"
+                >
+                  Save / Update
+                </button>
+                <button
+                  onClick={() => loadPlansWindow(planDate ? new Date(planDate) : new Date())}
+                  className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-300 mb-2">Planned Days (±10d)</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-gray-300">Date</th>
+                        <th className="px-4 py-2 text-left text-gray-300">% Target</th>
+                        <th className="px-4 py-2 text-left text-gray-300">Note</th>
+                        <th className="px-4 py-2 text-left text-gray-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700">
+                      {loadingPlans && (
+                        <tr><td colSpan={4} className="px-4 py-3 text-gray-400">Loading…</td></tr>
+                      )}
+                      {!loadingPlans && plans.length === 0 && (
+                        <tr><td colSpan={4} className="px-4 py-3 text-gray-400">No plans in range</td></tr>
+                      )}
+                      {!loadingPlans && plans.map((p) => (
+                        <tr key={p.day} className="hover:bg-gray-700">
+                          <td className="px-4 py-2 text-white">{p.day}</td>
+                          <td className="px-4 py-2 text-white">{p.target_pct}%</td>
+                          <td className="px-4 py-2 text-gray-300">{p.note || '—'}</td>
+                          <td className="px-4 py-2">
+                            <button
+                              onClick={() => removePlan(p.day)}
+                              className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-xs"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

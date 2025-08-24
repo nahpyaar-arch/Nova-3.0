@@ -504,7 +504,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           change24h: 5.75,
           volume: 15000000,
           market_cap: 125000000,
-          is_custom: true,
+          is_custom: false,
           is_active: true,
           created_at: now,
           updated_at: now,
