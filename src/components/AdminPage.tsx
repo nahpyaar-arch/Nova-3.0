@@ -16,6 +16,30 @@ type MoonSchedule = {
   direction: 'increase' | 'decrease';
 };
 
+type PlanRow = { day: string; target_pct: number; note: string };
+
+// Helpers for JST day handling
+const fmtJST = (d: Date) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+
+const addDays = (d: Date, n: number) => {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+};
+
+const parseYmdToLocal = (ymd: string) => {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  // represent same calendar day in local time (avoids TZ shifts)
+  return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
+};
+
 export default function AdminPage() {
   // only pull what we actually use
   const { user, coins, updateCoinPrice, refreshData } = useApp();
@@ -88,24 +112,27 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAllowed]);
 
-  // ---- MOON plan state & helpers ------------------------------------------
+  // ---- MOON plan state & helpers (NOW USING NETLIFY FUNCTIONS) ------------
   const [planDate, setPlanDate] = useState<string>('');     // YYYY-MM-DD
   const [planPct, setPlanPct] = useState<string>('');       // e.g. "20"
   const [planNote, setPlanNote] = useState<string>('');
-  const [plans, setPlans] = useState<Array<{day: string; target_pct: number; note: string}>>([]);
+  const [plans, setPlans] = useState<PlanRow[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
 
-  async function loadPlansWindow(anchor = new Date()) {
-    const from = new Date(anchor); from.setDate(from.getDate() - 10);
-    const to = new Date(anchor);   to.setDate(to.getDate() + 10);
-    const toISO = (d: Date) => d.toISOString().slice(0,10);
+  async function loadPlansWindow(anchorDate?: string) {
+    const anchor = anchorDate ? parseYmdToLocal(anchorDate) : new Date();
+    const fromStr = fmtJST(addDays(anchor, -10));
+    const toStr   = fmtJST(addDays(anchor, +10));
 
     try {
       setLoadingPlans(true);
-      const data = await NeonDB.listMoonPlans(toISO(from), toISO(to));
-      setPlans(data);
+      const res = await fetch(`/.netlify/functions/get-moon-plans?from=${fromStr}&to=${toStr}`);
+      if (!res.ok) throw new Error(`get-moon-plans ${res.status}`);
+      const data = (await res.json()) as { plans?: PlanRow[] };
+      setPlans(data.plans ?? []);
     } catch (e) {
       console.error('Failed to load MOON plans:', e);
+      setPlans([]);
     } finally {
       setLoadingPlans(false);
     }
@@ -119,10 +146,17 @@ export default function AdminPage() {
   async function savePlan() {
     if (!planDate || planPct === '') return;
     const pct = Number(planPct);
-    if (!isFinite(pct)) return alert('Enter a valid percentage (e.g. 5, 20, -3)');
+    if (!isFinite(pct)) {
+      alert('Enter a valid percentage (e.g. 5, 20, -3)');
+      return;
+    }
     try {
-      await NeonDB.upsertMoonPlan(planDate, pct, planNote);
-      await loadPlansWindow(new Date(planDate));
+      await fetch('/.netlify/functions/upsert-moon-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ day: planDate, target_pct: pct, note: planNote }),
+      });
+      await loadPlansWindow(planDate);
       setPlanPct('');
       setPlanNote('');
       alert(`Saved plan: ${planDate} → ${pct}%`);
@@ -135,8 +169,12 @@ export default function AdminPage() {
   async function removePlan(day: string) {
     if (!confirm(`Delete plan for ${day}?`)) return;
     try {
-      await NeonDB.deleteMoonPlan(day);
-      await loadPlansWindow(new Date(day));
+      await fetch('/.netlify/functions/delete-moon-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ day }),
+      });
+      await loadPlansWindow(day);
     } catch (e) {
       console.error('Failed to delete plan:', e);
       alert('Failed to delete plan. Check console.');
@@ -210,7 +248,7 @@ export default function AdminPage() {
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white mb-3">Access Denied</h2>
-        <p className="text-gray-400 mb-6">You need administrator privileges to access this page.</p>
+          <p className="text-gray-400 mb-6">You need administrator privileges to access this page.</p>
           <button
             onClick={recheckAdmin}
             disabled={checkingAdmin}
@@ -411,7 +449,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* NEW: MOON Daily Target Planner */}
+            {/* NEW: MOON Daily Target Planner (wired to Netlify Functions) */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 lg:col-span-2">
               <h2 className="text-xl font-bold text-white mb-6">MOON Daily Target Planner</h2>
 
@@ -459,7 +497,7 @@ export default function AdminPage() {
                   Save / Update
                 </button>
                 <button
-                  onClick={() => loadPlansWindow(planDate ? new Date(planDate) : new Date())}
+                  onClick={() => loadPlansWindow(planDate || undefined)}
                   className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
                 >
                   Refresh
@@ -488,7 +526,7 @@ export default function AdminPage() {
                       {!loadingPlans && plans.map((p) => (
                         <tr key={p.day} className="hover:bg-gray-700">
                           <td className="px-4 py-2 text-white">{p.day}</td>
-                          <td className="px-4 py-2 text-white">{p.target_pct}%</td>
+                          <td className="px-4 py-2 text-white">{Number(p.target_pct).toFixed(2)}%</td>
                           <td className="px-4 py-2 text-gray-300">{p.note || '—'}</td>
                           <td className="px-4 py-2">
                             <button
