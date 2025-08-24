@@ -14,7 +14,7 @@ export async function handler() {
     if (!hasEnv) {
       throw new Error('VITE_DATABASE_URL is not set in Functions environment');
     }
-
+    console.log('Has DB URL?', !!process.env.VITE_DATABASE_URL);
     // today (UTC) as YYYY-MM-DD
     const today = new Date().toISOString().slice(0, 10);
 
