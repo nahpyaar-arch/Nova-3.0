@@ -2,25 +2,32 @@
 import { neon } from '@neondatabase/serverless';
 
 /**
- * IMPORTANT:
- * Put your connection string in env:
- *  - For the app (Vite): VITE_DATABASE_URL
- *  - For Netlify Functions: VITE_DATABASE_URL (or DATABASE_URL)
+ * IMPORTANT
+ * ----------
+ * - In the **browser (Vite)** you must use **VITE_DATABASE_URL**.
+ * - In **Netlify Functions/Node**, you must use **DATABASE_URL**
+ *   (fallback to VITE_DATABASE_URL if you really want, but DATABASE_URL is preferred).
+ *
+ * If neither is present, `sql` will be `null` and any DB method below that
+ * requires a connection will throw a clear, actionable error.
  */
 
-// --- Resolve DB URL safely in both environments (Node & browser) ---
+// ───────────────────────────────────────────────────────────
+// Resolve DB URL safely per environment
+// ───────────────────────────────────────────────────────────
+const isServer = typeof window === 'undefined';
+
 function resolveDbUrl(): string | undefined {
-  // Node / Netlify Functions: prefer process.env
-  if (typeof process !== 'undefined' && (process as any).env) {
+  if (isServer) {
+    // Netlify/Node
     return (
-      process.env.VITE_DATABASE_URL ||
       process.env.DATABASE_URL ||
+      process.env.VITE_DATABASE_URL || // fallback only
       undefined
     );
   }
-  // Browser (Vite): read from import.meta.env
+  // Browser (Vite)
   try {
-    // optional chaining protects on older bundlers
     return (import.meta as any)?.env?.VITE_DATABASE_URL;
   } catch {
     return undefined;
@@ -32,11 +39,19 @@ const databaseUrl = resolveDbUrl();
 // Single, canonical SQL export
 export const sql = databaseUrl ? neon(databaseUrl) : (null as any);
 
-// Warn in the browser if not configured
+// Helpful warnings (differentiate server vs client)
 if (!databaseUrl) {
-  console.warn(
-    'No VITE_DATABASE_URL / DATABASE_URL found; using mock data for DB reads.'
-  );
+  if (isServer) {
+    console.warn(
+      '[neon] No DATABASE_URL (or VITE_DATABASE_URL) found on the server. ' +
+        'Set DATABASE_URL in your Netlify environment.'
+    );
+  } else {
+    console.warn(
+      '[neon] No VITE_DATABASE_URL found in the browser. ' +
+        'Add VITE_DATABASE_URL to your Netlify environment (Build & Deploy → Environment).'
+    );
+  }
 }
 
 // ───────────────────────────────────────────────────────────
@@ -113,7 +128,7 @@ function mockCoins(): Coin[] {
     { id: '7',  symbol: 'AVAX',  name: 'Avalanche',  price: 36.8,    change_24h: 2.15, volume: 420000000,   market_cap: 13500000000,  is_custom: false, is_active: true, created_at: now, updated_at: now },
     { id: '8',  symbol: 'DOT',   name: 'Polkadot',   price: 7.25,    change_24h: -0.85,volume: 180000000,   market_cap: 9200000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
     { id: '9',  symbol: 'MATIC', name: 'Polygon',    price: 0.825,   change_24h: 1.45, volume: 320000000,   market_cap: 7800000000,   is_custom: false, is_active: true, created_at: now, updated_at: now },
-    // NOTE: keep mock in sync with DB semantics: is_custom = false for MOON
+    // keep mock in sync with DB semantics: is_custom = false for MOON
     { id: '10', symbol: 'MOON',  name: 'Moon Token', price: 0.0125,  change_24h: 5.75, volume: 15000000,    market_cap: 125000000,    is_custom: false, is_active: true, created_at: now, updated_at: now },
   ];
   return raw.map(normalizeCoin);
@@ -517,7 +532,6 @@ export class NeonDB {
 
 // ───────────────────────────────────────────────────────────
 // (Optional) Approve a deposit in a different table naming
-// If you don’t use a `deposits` table, you can remove this helper.
 // ───────────────────────────────────────────────────────────
 export async function approveDepositInNeon(depositId: string, adminId: string) {
   if (!sql) throw new Error('Database not connected');
@@ -631,7 +645,6 @@ export async function initializeDatabase() {
       )
     `;
 
-    // NEW: admin-set daily % targets for MOON
     await (sql as any)`
       CREATE TABLE IF NOT EXISTS moon_plans (
         day DATE PRIMARY KEY,
