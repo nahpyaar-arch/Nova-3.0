@@ -5,6 +5,7 @@ import { useApp } from '../contexts/AppContext';
 
 type TxResp = { ok: boolean; id?: string; to_amount?: number; fee?: number; message?: string };
 
+// Shared JSON POST helper (used by deposit/withdraw/exchange)
 async function postJson<T = any>(url: string, body: any): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
@@ -16,7 +17,9 @@ async function postJson<T = any>(url: string, body: any): Promise<T> {
     try {
       const j = await res.json();
       if (j?.message) msg += `: ${j.message}`;
-    } catch {}
+    } catch {
+      /* ignore JSON parse error */
+    }
     throw new Error(msg);
   }
   try {
@@ -66,7 +69,7 @@ export default function AssetsPage() {
     MOON: ['Nova Network'],
   };
 
-  // options for all selects (used to silence/avoid “declared but never used”)
+  // options for selects
   const coinOptions = useMemo(
     () =>
       coins
@@ -76,7 +79,10 @@ export default function AssetsPage() {
   );
 
   const totalValue = useMemo(() => {
-    return Object.entries(balances).reduce((sum, [sym, bal]) => sum + (bal as number) * priceOf(sym), 0);
+    return Object.entries(balances).reduce(
+      (sum, [sym, bal]) => sum + Number(bal ?? 0) * priceOf(sym),
+      0
+    );
   }, [balances, coins]);
 
   const copyToClipboard = (text: string, key: string) => {
@@ -85,27 +91,29 @@ export default function AssetsPage() {
     setTimeout(() => setCopiedAddress(''), 2000);
   };
 
-  // -------- Handlers (user-safe) -------------------------------------------
+  // -------- Handlers --------------------------------------------------------
+
   async function handleDeposit() {
-    const uid = user?.id;
-    if (!uid) {
-      alert('Please sign in again.');
-      return;
-    }
-    const amt = Number(amount);
-    if (!withdrawNetwork || !isFinite(amt) || amt <= 0) return;
-
-    await postJson<TxResp>('/.netlify/functions/create-deposit', {
-      user_id: uid,
-      coin_symbol: selectedCoin,
-      amount: amt,
-      details: { network: withdrawNetwork },
+  const uid = user?.id;
+  if (!uid) { alert('Please sign in again.'); return; }
+  const amt = Number(amount);
+  if (!withdrawNetwork || !isFinite(amt) || amt <= 0) {
+    alert('Enter a valid amount and network.');
+    return;
+  }
+  try {
+    await postJson('/.netlify/functions/create-deposit', {
+      user_id: uid, coin_symbol: selectedCoin, amount: amt, details: { network: withdrawNetwork }
     });
-
     setAmount('');
     await refreshData?.();
     alert('Deposit request submitted for admin approval.');
+  } catch (e:any) {
+    console.error(e);
+    alert(e?.message || 'Deposit failed');
   }
+}
+
 
   async function handleWithdraw() {
     const uid = user?.id;
@@ -113,8 +121,12 @@ export default function AssetsPage() {
       alert('Please sign in again.');
       return;
     }
+
     const amt = Number(amount);
-    if (!withdrawAddress || !withdrawNetwork || !isFinite(amt) || amt <= 0) return;
+    if (!withdrawAddress?.trim() || !withdrawNetwork || !isFinite(amt) || amt <= 0) {
+      alert('Fill in address, network, and a valid amount.');
+      return;
+    }
 
     const available = Number(balances[selectedCoin] ?? 0);
     if (available < amt) {
@@ -122,18 +134,29 @@ export default function AssetsPage() {
       return;
     }
 
-    await postJson<TxResp>('/.netlify/functions/create-withdraw', {
-      user_id: uid,
-      coin_symbol: selectedCoin,
-      amount: amt,
-      details: { address: withdrawAddress, network: withdrawNetwork, memo: withdrawMemo || undefined },
-    });
+    try {
+      const resp = await postJson<TxResp>('/.netlify/functions/create-withdraw', {
+        user_id: uid,
+        coin_symbol: selectedCoin,
+        amount: amt,
+        details: {
+          address: withdrawAddress.trim(),
+          network: withdrawNetwork,
+          memo: withdrawMemo || '',
+        },
+      });
 
-    setAmount('');
-    setWithdrawAddress('');
-    setWithdrawMemo('');
-    await refreshData?.();
-    alert('Withdrawal request submitted for admin approval.');
+      if (!resp?.ok) throw new Error(resp?.message || 'Failed to create withdrawal');
+
+      setAmount('');
+      setWithdrawAddress('');
+      setWithdrawMemo('');
+      await refreshData?.();
+      alert('Withdrawal request submitted for admin approval.');
+    } catch (e: any) {
+      console.error('withdraw error:', e);
+      alert(`Withdrawal failed: ${e?.message || e}`);
+    }
   }
 
   async function handleExchange() {
@@ -148,7 +171,10 @@ export default function AssetsPage() {
     }
 
     const amt = Number(exchangeAmount);
-    if (!isFinite(amt) || amt <= 0) return;
+    if (!isFinite(amt) || amt <= 0) {
+      alert('Enter a valid amount.');
+      return;
+    }
 
     const have = Number(balances[exchangeFrom] ?? 0);
     if (have < amt) {
@@ -167,14 +193,14 @@ export default function AssetsPage() {
     await refreshData?.();
 
     if (!resp?.ok) {
-      alert('Exchange failed.');
+      alert(resp?.message || 'Exchange failed.');
       return;
     }
     const got = Number(resp?.to_amount ?? 0);
     alert(`Exchanged ${amt} ${exchangeFrom} → ${got.toFixed(6)} ${exchangeTo}`);
   }
 
-  // Gate (kept to short-circuit the UI if not logged in)
+  // Gate (short-circuit the UI if not logged in)
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -622,7 +648,7 @@ export default function AssetsPage() {
                     {(() => {
                       const largest = Object.entries(balances).reduce(
                         (max, [sym, bal]) => {
-                          const v = Number(bal as number) * priceOf(sym);
+                          const v = Number(bal ?? 0) * priceOf(sym);
                           return v > max.value ? { sym, value: v } : max;
                         },
                         { sym: '', value: 0 }

@@ -221,16 +221,22 @@ export default function AdminPage() {
   };
 
   // Approve/Reject WITHDRAWAL via functions (make sure functions exist)
-  const handleWithdrawalAction = async (transactionId: string, action: 'approve' | 'reject') => {
-    try {
-      await postJson(`/.netlify/functions/${action}-withdraw`, { id: transactionId });
-      await loadQueues();
-      await refreshData();
-    } catch (e) {
-      console.error('Failed to update withdrawal:', e);
-      alert('Failed to update withdrawal. See console for details.');
-    }
-  };
+  // Approve/Reject WITHDRAWAL via functions (admin)
+const handleWithdrawalAction = async (
+  transactionId: string,
+  action: 'approve' | 'reject'
+) => {
+  try {
+    await postJson(`/.netlify/functions/${action}-withdraw`, { id: transactionId });
+    await loadQueues();   // refresh the pending lists
+    await refreshData();  // refresh any user/portfolio data
+  } catch (err) {
+    console.error('Failed to update withdrawal:', err);
+    alert('Failed to update withdrawal. See console for details.');
+  }
+};
+
+
 
   // ---- Gate ---------------------------------------------------------------
   if (!isAllowed) {
