@@ -13,12 +13,12 @@ export const handler: Handler = async (event) => {
     await sql`
       UPDATE transactions
       SET status = 'rejected'
-      WHERE id = ${id} AND type = 'deposit' AND status = 'pending';
+      WHERE id = ${id} AND type = 'withdraw' AND status = 'pending';
     `;
 
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (e: any) {
-    console.error('reject-deposit error', e);
+    console.error('reject-withdraw error', e);
     return { statusCode: 500, body: String(e?.message || e) };
   }
 };
