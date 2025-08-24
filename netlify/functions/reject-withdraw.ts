@@ -1,49 +1,45 @@
+// netlify/functions/reject-withdraw.ts
 import type { Handler } from '@netlify/functions';
 import { neon } from '@neondatabase/serverless';
 
-const H = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
-
 export const handler: Handler = async (event) => {
   try {
-    const body = event.body ? JSON.parse(event.body) : {};
-    const id = body.id || event.queryStringParameters?.id;
-    if (!id) return { statusCode: 400, headers: H, body: JSON.stringify({ ok: false, error: 'Missing id' }) };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Use POST' };
 
     const dbUrl = process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
-    if (!dbUrl) return { statusCode: 500, headers: H, body: JSON.stringify({ ok: false, error: 'DATABASE_URL not set' }) };
+    if (!dbUrl) return { statusCode: 500, body: 'DATABASE_URL not set' };
     const sql = neon(dbUrl);
 
-    // fetch tx
+    const { id } = JSON.parse(event.body || '{}');
+    if (!id) return { statusCode: 400, body: 'Missing id' };
+
     const txRows = await sql`
-      SELECT id, user_id, coin_symbol, amount, status, type
+      SELECT user_id, coin_symbol, amount
       FROM transactions
-      WHERE id = ${id}
-      LIMIT 1
+      WHERE id = ${id} AND type = 'withdraw' AND status = 'pending'
     `;
-    if (txRows.length === 0) return { statusCode: 404, headers: H, body: JSON.stringify({ ok: false, error: 'Transaction not found' }) };
+    const tx = txRows[0];
+    if (!tx) return { statusCode: 404, body: 'Not found or not pending' };
 
-    const tx: any = txRows[0];
-    if (tx.type !== 'withdraw') return { statusCode: 400, headers: H, body: JSON.stringify({ ok: false, error: 'Not a withdrawal' }) };
+    const { user_id, coin_symbol, amount } = tx as any;
 
-    const userId = String(tx.user_id);
-    const symbol = String(tx.coin_symbol);
-    const amount = Number(tx.amount);
-
-    // credit back to available balance
+    // credit back to balance (typical “unlock”/refund)
     await sql`
       INSERT INTO user_balances (id, user_id, coin_symbol, balance, locked_balance, created_at, updated_at)
-      VALUES (${crypto.randomUUID()}, ${userId}, ${symbol}, ${amount}, 0, NOW(), NOW())
+      VALUES (${crypto.randomUUID()}, ${user_id}, ${coin_symbol}, ${amount}, 0, NOW(), NOW())
       ON CONFLICT (user_id, coin_symbol)
-      DO UPDATE SET
-        balance    = user_balances.balance + ${amount},
-        updated_at = NOW()
+      DO UPDATE SET balance = user_balances.balance + EXCLUDED.balance, updated_at = NOW()
     `;
 
-    await sql`UPDATE transactions SET status = 'rejected', updated_at = NOW() WHERE id = ${id}`;
+    await sql`
+      UPDATE transactions
+      SET status = 'rejected', updated_at = NOW()
+      WHERE id = ${id}
+    `;
 
-    return { statusCode: 200, headers: H, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (e: any) {
     console.error('reject-withdraw error', e);
-    return { statusCode: 500, headers: H, body: JSON.stringify({ ok: false, error: String(e?.message || e) }) };
+    return { statusCode: 500, body: String(e?.message || e) };
   }
 };

@@ -1,70 +1,63 @@
+// netlify/functions/approve-withdraw.ts
 import type { Handler } from '@netlify/functions';
 import { neon } from '@neondatabase/serverless';
 
-const H = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
-
 export const handler: Handler = async (event) => {
   try {
-    // allow id via POST body or GET ?id=
-    const body = event.body ? JSON.parse(event.body) : {};
-    const id = body.id || event.queryStringParameters?.id;
-    if (!id) return { statusCode: 400, headers: H, body: JSON.stringify({ ok: false, error: 'Missing id' }) };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Use POST' };
 
     const dbUrl = process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
-    if (!dbUrl) return { statusCode: 500, headers: H, body: JSON.stringify({ ok: false, error: 'DATABASE_URL not set' }) };
+    if (!dbUrl) return { statusCode: 500, body: 'DATABASE_URL not set' };
     const sql = neon(dbUrl);
 
-    // fetch tx
+    const { id } = JSON.parse(event.body || '{}');
+    if (!id) return { statusCode: 400, body: 'Missing id' };
+
     const txRows = await sql`
-      SELECT id, user_id, coin_symbol, amount, status, type
+      SELECT user_id, coin_symbol, amount
       FROM transactions
-      WHERE id = ${id}
-      LIMIT 1
+      WHERE id = ${id} AND type = 'withdraw' AND status = 'pending'
     `;
-    if (txRows.length === 0) return { statusCode: 404, headers: H, body: JSON.stringify({ ok: false, error: 'Transaction not found' }) };
+    const tx = txRows[0];
+    if (!tx) return { statusCode: 404, body: 'Not found or not pending' };
 
-    const tx: any = txRows[0];
-    if (tx.type !== 'withdraw') return { statusCode: 400, headers: H, body: JSON.stringify({ ok: false, error: 'Not a withdrawal' }) };
-    if (tx.status !== 'pending') return { statusCode: 200, headers: H, body: JSON.stringify({ ok: true, note: 'already processed' }) };
+    const { user_id, coin_symbol, amount } = tx as any;
 
-    const userId = String(tx.user_id);
-    const symbol = String(tx.coin_symbol);
-    const amount = Number(tx.amount);
-
-    // try deduct from locked; else from balance
     const balRows = await sql`
       SELECT balance, locked_balance
       FROM user_balances
-      WHERE user_id = ${userId} AND coin_symbol = ${symbol}
-      LIMIT 1
+      WHERE user_id = ${user_id} AND coin_symbol = ${coin_symbol}
     `;
-    const b = balRows[0] ?? { balance: 0, locked_balance: 0 };
-    const balance = Number(b.balance ?? 0);
-    const locked  = Number(b.locked_balance ?? 0);
+    const cur = balRows[0] || { balance: 0, locked_balance: 0 };
+    const bal = Number(cur.balance || 0);
+    const locked = Number(cur.locked_balance || 0);
+    const amt = Number(amount);
 
-    if (locked >= amount) {
+    if (locked >= amt) {
       await sql`
         UPDATE user_balances
-        SET locked_balance = locked_balance - ${amount},
-            updated_at     = NOW()
-        WHERE user_id = ${userId} AND coin_symbol = ${symbol}
+        SET locked_balance = locked_balance - ${amt}, updated_at = NOW()
+        WHERE user_id = ${user_id} AND coin_symbol = ${coin_symbol}
       `;
-    } else if (balance >= amount) {
+    } else if (bal >= amt) {
       await sql`
         UPDATE user_balances
-        SET balance = balance - ${amount},
-            updated_at = NOW()
-        WHERE user_id = ${userId} AND coin_symbol = ${symbol}
+        SET balance = balance - ${amt}, updated_at = NOW()
+        WHERE user_id = ${user_id} AND coin_symbol = ${coin_symbol}
       `;
     } else {
-      return { statusCode: 400, headers: H, body: JSON.stringify({ ok: false, error: 'Insufficient funds' }) };
+      return { statusCode: 400, body: 'Insufficient funds' };
     }
 
-    await sql`UPDATE transactions SET status = 'completed', updated_at = NOW() WHERE id = ${id}`;
+    await sql`
+      UPDATE transactions
+      SET status = 'completed', updated_at = NOW()
+      WHERE id = ${id}
+    `;
 
-    return { statusCode: 200, headers: H, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (e: any) {
     console.error('approve-withdraw error', e);
-    return { statusCode: 500, headers: H, body: JSON.stringify({ ok: false, error: String(e?.message || e) }) };
+    return { statusCode: 500, body: String(e?.message || e) };
   }
 };

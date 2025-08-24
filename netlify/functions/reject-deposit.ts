@@ -1,21 +1,29 @@
+// netlify/functions/reject-deposit.ts
 import type { Handler } from '@netlify/functions';
 import { neon } from '@neondatabase/serverless';
-const H = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 
 export const handler: Handler = async (event) => {
   try {
-    const body = event.body ? JSON.parse(event.body) : {};
-    const id = body.id || event.queryStringParameters?.id;
-    if (!id) return { statusCode: 400, headers: H, body: JSON.stringify({ ok: false, error: 'Missing id' }) };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Use POST' };
 
-    const db = process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
-    if (!db) return { statusCode: 500, headers: H, body: JSON.stringify({ ok: false, error: 'DATABASE_URL not set' }) };
-    const sql = neon(db);
+    const dbUrl = process.env.DATABASE_URL || process.env.VITE_DATABASE_URL;
+    if (!dbUrl) return { statusCode: 500, body: 'DATABASE_URL not set' };
+    const sql = neon(dbUrl);
 
-    await sql`UPDATE transactions SET status = 'rejected', updated_at = NOW() WHERE id = ${id}`;
-    return { statusCode: 200, headers: H, body: JSON.stringify({ ok: true }) };
+    const { id } = JSON.parse(event.body || '{}');
+    if (!id) return { statusCode: 400, body: 'Missing id' };
+
+    const rows = await sql`
+      UPDATE transactions
+      SET status = 'rejected', updated_at = NOW()
+      WHERE id = ${id} AND type = 'deposit' AND status = 'pending'
+      RETURNING id
+    `;
+    if (rows.length === 0) return { statusCode: 404, body: 'Not found or not pending' };
+
+    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (e: any) {
     console.error('reject-deposit error', e);
-    return { statusCode: 500, headers: H, body: JSON.stringify({ ok: false, error: String(e?.message || e) }) };
+    return { statusCode: 500, body: String(e?.message || e) };
   }
 };
