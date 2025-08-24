@@ -9,12 +9,12 @@ import {
 } from 'react';
 
 import {
-  NeonDB,
-  initializeDatabase,
+  NeonDB,                 // still used for some writes / coin helpers
+  initializeDatabase,     // no-op on client stub
   type Profile,
   type Coin,
   type Transaction,
-  pingDB,
+  pingDB,                  // client stub returns { ok:false }
 } from '../lib/neon';
 
 // Supabase helpers
@@ -312,6 +312,28 @@ const normalizeCoin = (c: any) => ({
   market_cap: toNum((c as any).market_cap ?? (c as any).marketCap),
 });
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Helper: call server to get profile+balances+transactions
+   ────────────────────────────────────────────────────────────────────────── */
+async function fetchUserDataFromServer(opts: {
+  email?: string;
+  id?: string;
+}): Promise<{
+  profile: Profile;
+  balances: Array<{ coin_symbol: string; balance: number }>;
+  transactions: Transaction[];
+}> {
+  const qs = opts.id
+    ? `id=${encodeURIComponent(opts.id)}`
+    : `email=${encodeURIComponent(opts.email || '')}`;
+  const res = await fetch(`/.netlify/functions/get-user-data?${qs}`);
+  const json = await res.json();
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.error || res.statusText);
+  }
+  return json;
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [coins, setCoins] = useState<Coin[]>([]);
@@ -340,34 +362,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     initApp();
   }, []);
 
-  // Restore user & transactions (from Supabase + fallbacks)
+  // Restore user & transactions via server function
   useEffect(() => {
     const savedEmail = localStorage.getItem('nova_user_email');
     if (!savedEmail) return;
     (async () => {
       try {
-        const { profile: sbProfile } = await getProfileByEmail(savedEmail);
-        if (!sbProfile) return;
+        const j = await fetchUserDataFromServer({ email: savedEmail });
 
-        const now = new Date().toISOString();
-        const derived: Profile = {
-          id: (sbProfile as any).id ?? crypto.randomUUID(),
-          email: savedEmail,
-          name: sbProfile.name ?? savedEmail.split('@')[0],
-          is_admin: !!sbProfile.is_admin,
-          language: (sbProfile as any).language ?? 'en',
-          created_at: now,
-          updated_at: now,
-        };
+        const balMap: Record<string, number> = {};
+        (j.balances || []).forEach((r) => {
+          balMap[r.coin_symbol] = Number(r.balance ?? 0);
+        });
 
-        const balances = await NeonDB.getUserBalances(derived.id);
-        setUser({ ...derived, balances });
-        if (derived.language && derived.language !== language) {
-          setLanguage(derived.language);
+        const profile = j.profile as Profile;
+        setUser({ ...profile, balances: balMap });
+        setTransactions((j.transactions || []) as Transaction[]);
+
+        if (profile.language && profile.language !== language) {
+          setLanguage(profile.language);
         }
-
-        const txs = await NeonDB.getUserTransactions(derived.id);
-        setTransactions(txs);
       } catch (e) {
         console.warn('Could not restore user:', e);
         localStorage.removeItem('nova_user_email');
@@ -384,154 +398,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── Data loaders
   const loadCoins = async () => {
     try {
-      const coinsData = await NeonDB.getCoins();
+      const coinsData = await NeonDB.getCoins(); // client stub returns mock list
       setCoins(coinsData.map(normalizeCoin) as any);
     } catch (error) {
       console.error('Error loading coins:', error);
-      const now = new Date().toISOString();
-      setCoins([
-        {
-          id: '1',
-          symbol: 'BTC',
-          name: 'Bitcoin',
-          price: 43250.0,
-          change24h: 2.45,
-          volume: 28500000000,
-          market_cap: 847000000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '2',
-          symbol: 'ETH',
-          name: 'Ethereum',
-          price: 2650.0,
-          change24h: 1.85,
-          volume: 15200000000,
-          market_cap: 318000000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '3',
-          symbol: 'BNB',
-          name: 'BNB',
-          price: 315.5,
-          change24h: 0.95,
-          volume: 1800000000,
-          market_cap: 47200000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '4',
-          symbol: 'USDT',
-          name: 'Tether',
-          price: 1.0,
-          change24h: 0.01,
-          volume: 45000000000,
-          market_cap: 95000000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '5',
-          symbol: 'SOL',
-          name: 'Solana',
-          price: 98.75,
-          change24h: 3.25,
-          volume: 2100000000,
-          market_cap: 42800000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '6',
-          symbol: 'ADA',
-          name: 'Cardano',
-          price: 0.485,
-          change24h: -1.25,
-          volume: 580000000,
-          market_cap: 17200000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '7',
-          symbol: 'AVAX',
-          name: 'Avalanche',
-          price: 36.8,
-          change24h: 2.15,
-          volume: 420000000,
-          market_cap: 13500000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '8',
-          symbol: 'DOT',
-          name: 'Polkadot',
-          price: 7.25,
-          change24h: -0.85,
-          volume: 180000000,
-          market_cap: 9200000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '9',
-          symbol: 'MATIC',
-          name: 'Polygon',
-          price: 0.825,
-          change24h: 1.45,
-          volume: 320000000,
-          market_cap: 7800000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-        {
-          id: '10',
-          symbol: 'MOON',
-          name: 'Moon Token',
-          price: 0.0125,
-          change24h: 5.75,
-          volume: 15000000,
-          market_cap: 125000000,
-          is_custom: false,
-          is_active: true,
-          created_at: now,
-          updated_at: now,
-        },
-      ] as any);
     }
   };
 
   const loadUserData = async (userId: string) => {
     try {
-      const [balances, userTransactions] = await Promise.all([
-        NeonDB.getUserBalances(userId),
-        NeonDB.getUserTransactions(userId),
-      ]);
-      setUser((prev) => (prev ? { ...prev, balances } : prev));
-      setTransactions(userTransactions);
+      const j = await fetchUserDataFromServer({ id: userId });
+      const balMap: Record<string, number> = {};
+      (j.balances || []).forEach((r) => {
+        balMap[r.coin_symbol] = Number(r.balance ?? 0);
+      });
+      setUser((prev) => (prev ? { ...prev, balances: balMap } : prev));
+      setTransactions((j.transactions || []) as Transaction[]);
     } catch (error) {
       console.error('Error loading user data:', error);
     }
@@ -541,13 +423,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const uid = targetUserId ?? user?.id;
       if (!uid) return;
-      const [bals, txs] = await Promise.all([
-        NeonDB.getUserBalances(uid),
-        NeonDB.getUserTransactions(uid),
-      ]);
-      Object.keys(bals).forEach((k) => (bals[k] = Number(bals[k] ?? 0)));
-      setUser((prev) => (prev ? { ...prev, balances: bals } : prev));
-      setTransactions(txs);
+      await loadUserData(uid);
     } catch (e) {
       console.error('refreshUserData failed:', e);
     }
@@ -574,7 +450,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  /* ────────────── Auth: Supabase + server upsert ────────────── */
+  /* ────────────── Auth: Supabase + server upsert + server read ────────────── */
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       // 1) Supabase auth
@@ -606,28 +482,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error('Profile sync failed:', err);
       }
 
-      // 3) Read profile from Supabase (public) and build local user
-      const { profile: sbProfile } = await getProfileByEmail(email);
-      const now = new Date().toISOString();
-      const localProfile: Profile = {
-        id: (sbProfile as any)?.id ?? data.user?.id ?? crypto.randomUUID(),
-        email,
-        name: sbProfile?.name ?? email.split('@')[0],
-        is_admin: !!sbProfile?.is_admin,
-        language: (sbProfile as any)?.language ?? 'en',
-        created_at: now,
-        updated_at: now,
-      };
+      // 3) Pull profile + balances + txs from the server
+      const j = await fetchUserDataFromServer({ email });
 
-      // 4) Load balances & txs and set context
-      const balances = await NeonDB.getUserBalances(localProfile.id);
-      setUser({ ...localProfile, balances });
-      if (localProfile.language && localProfile.language !== language) {
-        setLanguage(localProfile.language);
+      const balMap: Record<string, number> = {};
+      (j.balances || []).forEach((r) => {
+        balMap[r.coin_symbol] = Number(r.balance ?? 0);
+      });
+
+      const profile = j.profile as Profile;
+      setUser({ ...profile, balances: balMap });
+      setTransactions((j.transactions || []) as Transaction[]);
+      if (profile.language && profile.language !== language) {
+        setLanguage(profile.language);
       }
 
-      localStorage.setItem('nova_user_email', localProfile.email);
-      await loadUserData(localProfile.id);
+      localStorage.setItem('nova_user_email', profile.email);
       await refreshData();
 
       return true;
@@ -679,22 +549,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.warn('Server profile upsert failed (non-fatal):', e);
       }
 
-      // 4) Build local user (balances via safe fallback)
-      const now = new Date().toISOString();
-      const localProfile: Profile = {
-        id: (authData as any)?.user?.id ?? crypto.randomUUID(),
-        email,
-        name,
-        is_admin: isAdmin,
-        language: 'en',
-        created_at: now,
-        updated_at: now,
-      };
+      // 4) Pull fresh data from server and set context
+      const j = await fetchUserDataFromServer({ email });
 
-      const balances = await NeonDB.getUserBalances(localProfile.id);
-      setUser({ ...localProfile, balances });
-      localStorage.setItem('nova_user_email', localProfile.email);
-      await loadUserData(localProfile.id);
+      const balMap: Record<string, number> = {};
+      (j.balances || []).forEach((r) => {
+        balMap[r.coin_symbol] = Number(r.balance ?? 0);
+      });
+
+      const serverProfile = j.profile as Profile;
+      setUser({ ...serverProfile, balances: balMap });
+      setTransactions((j.transactions || []) as Transaction[]);
+      localStorage.setItem('nova_user_email', serverProfile.email);
 
       return true;
     } catch (e) {
@@ -714,7 +580,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('nova_user_email');
   };
 
-  /* ────────────── Data mutations ────────────── */
+  /* ────────────── Data mutations ──────────────
+     NOTE: These still call NeonDB.*; if you want to harden further,
+     move them behind Netlify Functions just like get-user-data. */
   const updateBalance = async (
     coinSymbol: string,
     amount: number
@@ -735,8 +603,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       await NeonDB.addTransaction(t);
       if (user) {
-        const userTx = await NeonDB.getUserTransactions(user.id);
-        setTransactions(userTx);
+        await refreshUserData(user.id);
       }
     } catch (error) {
       console.error('Error adding transaction:', error);
