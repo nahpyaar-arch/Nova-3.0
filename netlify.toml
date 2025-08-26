@@ -8,19 +8,26 @@
   node_bundler = "esbuild"
   external_node_modules = ["@neondatabase/serverless"]
 
-# 1) Canonicalize www to apex FIRST (processed in order)
+# 1) Canonicalize www -> apex (if you use this domain)
 [[redirects]]
   from = "https://www.novatradeapp.com/*"
   to   = "https://novatradeapp.com/:splat"
   status = 301
   force = true
 
-# 2) SPA fallback
+# 2) Let function routes pass through (must be before SPA fallback)
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to   = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+# 3) SPA fallback
 [[redirects]]
   from = "/*"
   to   = "/index.html"
   status = 200
 
-# 3) Scheduled function (runs daily at 03:00 UTC)
-[functions.applyMoonPlan]
+# 4) Scheduled function (runs daily at 03:00 UTC)
+[functions."applyMoonPlan"]
   schedule = "0 3 * * *"
