@@ -1,3 +1,4 @@
+// src/components/Layout.tsx
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
@@ -13,52 +14,46 @@ import {
   Shield,
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import BottomTabs from './BottomTabs';
 
 const LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'en', name: 'English',  flag: '🇺🇸' },
+  { code: 'es', name: 'Español',  flag: '🇪🇸' },
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+  { code: 'de', name: 'Deutsch',  flag: '🇩🇪' },
   { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-  { code: 'pt', name: 'Português', flag: '🇵🇹' },
-  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-  { code: 'ja', name: '日本語', flag: '🇯🇵' },
-  { code: 'ko', name: '한국어', flag: '🇰🇷' },
-  { code: 'zh', name: '中文', flag: '🇨🇳' },
+  { code: 'pt', name: 'Português',flag: '🇵🇹' },
+  { code: 'ru', name: 'Русский',  flag: '🇷🇺' },
+  { code: 'ja', name: '日本語',     flag: '🇯🇵' },
+  { code: 'ko', name: '한국어',      flag: '🇰🇷' },
+  { code: 'zh', name: '中文',        flag: '🇨🇳' },
 ];
 
 export default function Layout() {
   const { user, language, setLanguage, t } = useApp();
   const location = useLocation();
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Build navigation with translated labels on every render (reactive to language)
-  const navigation = [
-    { key: 'home', name: t('nav.home'), href: '/', icon: Home },
-    { key: 'market', name: t('nav.market'), href: '/market', icon: TrendingUp },
-    { key: 'trade', name: t('nav.trade'), href: '/trade', icon: BarChart3 },
-    { key: 'assets', name: t('nav.assets'), href: '/assets', icon: Wallet },
+  const nav = [
+    { key: 'home',    name: t('nav.home'),    href: '/',        icon: Home },
+    { key: 'market',  name: t('nav.market'),  href: '/market',  icon: TrendingUp },
+    { key: 'trade',   name: t('nav.trade'),   href: '/trade',   icon: BarChart3 },
+    { key: 'assets',  name: t('nav.assets'),  href: '/assets',  icon: Wallet },
     { key: 'profile', name: t('nav.profile'), href: '/profile', icon: User },
   ] as Array<{ key: string; name: string; href: string; icon: any }>;
 
   if (user?.is_admin) {
-    navigation.push({
-      key: 'admin',
-      name: t('nav.admin'),
-      href: '/admin',
-      icon: Shield,
-    });
+    nav.push({ key: 'admin', name: t('nav.admin'), href: '/admin', icon: Shield });
   }
 
-  const currentLanguage =
-    LANGUAGES.find((lang) => lang.code === language) || LANGUAGES[0];
+  const isActive = (href: string) =>
+    href === '/' ? location.pathname === '/' : location.pathname.startsWith(href);
 
-  const isActive = (href: string) => {
-    if (href === '/') return location.pathname === '/';
-    return location.pathname.startsWith(href);
-  };
+  const currentLanguage =
+    LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -76,9 +71,9 @@ export default function Layout() {
               </Link>
             </div>
 
-            {/* Desktop Navigation */}
+            {/* Desktop nav */}
             <nav className="hidden md:flex space-x-8">
-              {navigation.map((item) => {
+              {nav.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (
@@ -98,21 +93,21 @@ export default function Layout() {
               })}
             </nav>
 
-            {/* Right side controls */}
+            {/* Right controls */}
             <div className="flex items-center space-x-4">
-              {/* Live Chat */}
+              {/* Chat (local modal) */}
               <button
-                onClick={() => setIsChatOpen(!isChatOpen)}
+                onClick={() => setIsChatOpen(true)}
                 className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
                 title="Live Chat"
               >
                 <MessageCircle className="w-5 h-5" />
               </button>
 
-              {/* Language Selector */}
+              {/* Language */}
               <div className="relative">
                 <button
-                  onClick={() => setIsLanguageOpen(!isLanguageOpen)}
+                  onClick={() => setIsLanguageOpen((v) => !v)}
                   className="flex items-center space-x-1 p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
                 >
                   <Globe className="w-5 h-5" />
@@ -144,26 +139,22 @@ export default function Layout() {
                 )}
               </div>
 
-              {/* Mobile menu button */}
+              {/* Mobile menu toggle */}
               <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                onClick={() => setIsMobileMenuOpen((v) => !v)}
                 className="md:hidden p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md"
               >
-                {isMobileMenuOpen ? (
-                  <X className="w-5 h-5" />
-                ) : (
-                  <Menu className="w-5 h-5" />
-                )}
+                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile drawer */}
         {isMobileMenuOpen && (
           <div className="md:hidden bg-gray-800 border-t border-gray-700">
             <div className="px-2 pt-2 pb-3 space-y-1">
-              {navigation.map((item) => {
+              {nav.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (
@@ -187,36 +178,29 @@ export default function Layout() {
         )}
       </header>
 
-      {/* Live Chat Modal */}
+      {/* Simple chat modal */}
       {isChatOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-gray-800 rounded-lg w-full max-w-md h-96 flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
               <h3 className="text-lg font-semibold text-white">Live Chat</h3>
-              <button
-                onClick={() => setIsChatOpen(false)}
-                className="text-gray-400 hover:text-white"
-              >
+              <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="flex-1 p-4 overflow-y-auto">
-              <div className="space-y-4">
-                <div className="bg-gray-700 p-3 rounded-lg">
-                  <p className="text-sm text-gray-300">
-                    Welcome to Nova Live Chat! How can we help you today?
-                  </p>
-                </div>
+              <div className="bg-gray-700 p-3 rounded-lg text-sm text-gray-300">
+                Chat is loading… If the widget doesn’t appear, please try again later.
               </div>
             </div>
             <div className="p-4 border-t border-gray-700">
-              <div className="flex space-x-2">
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Type your message..."
+                  placeholder="Type your message…"
                   className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
+                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
                   Send
                 </button>
               </div>
@@ -225,10 +209,13 @@ export default function Layout() {
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1">
+      {/* Main content — extra bottom padding so BottomTabs never covers inputs */}
+      <main className="flex-1 pb-28 md:pb-0">
         <Outlet />
       </main>
+
+      {/* Binance-style bottom tabs (mobile only) */}
+      <BottomTabs />
     </div>
   );
 }

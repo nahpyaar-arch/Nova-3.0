@@ -14,7 +14,7 @@ export const handler: Handler = async (event) => {
 
   const user_id = String(body.user_id || '');
   const from_symbol = String(body.from_symbol || '').toUpperCase();
-  const to_symbol = String(body.to_symbol || '').toUpperCase();
+  const to_symbol   = String(body.to_symbol || '').toUpperCase();
   const amount = Number(body.amount || 0);
 
   if (!user_id) return { statusCode: 400, body: 'Missing user_id' };
@@ -34,15 +34,14 @@ export const handler: Handler = async (event) => {
     `;
     const priceMap = Object.fromEntries(priceRows.map((r: any) => [r.symbol, Number(r.price)]));
     const fromPrice = Number(priceMap[from_symbol] || 0);
-    const toPrice = Number(priceMap[to_symbol] || 0);
+    const toPrice   = Number(priceMap[to_symbol]   || 0);
     if (!fromPrice || !toPrice) {
       return { statusCode: 400, body: JSON.stringify({ ok: false, message: 'Price not available' }) };
     }
 
     const valueUSD = amount * fromPrice;
-    const feeUSD = valueUSD * 0.001; // 0.1%
+    const feeUSD   = valueUSD * 0.001; // 0.1%
     const toAmount = (valueUSD - feeUSD) / toPrice;
-
     const now = new Date().toISOString();
 
     // ensure destination balance row exists
@@ -72,6 +71,7 @@ export const handler: Handler = async (event) => {
       WHERE user_id = ${user_id} AND coin_symbol = ${to_symbol}
     `;
 
+    // record transaction
     const txid = crypto.randomUUID();
     await sql`
       INSERT INTO transactions

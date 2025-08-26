@@ -1,73 +1,90 @@
 // src/components/TradePage.tsx
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 
 export default function TradePage() {
-  const { coins, user, updateBalance, addTransaction } = useApp();
+  const { coins, user, refreshData } = useApp();
   const [selectedCoin, setSelectedCoin] = useState('BTC');
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('');               // amount in COIN units
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [limitPrice, setLimitPrice] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const selectedCoinData = coins.find((coin) => coin.symbol === selectedCoin);
-  const userBalance = user?.balances[selectedCoin] || 0;
-  const usdtBalance = user?.balances['USDT'] || 0;
+  const coin = useMemo(
+    () => coins.find(c => c.symbol === selectedCoin),
+    [coins, selectedCoin]
+  );
 
-  const calculateTotal = () => {
-    if (!selectedCoinData || !amount) return 0;
-    const price =
-      orderType === 'limit' && limitPrice
-        ? parseFloat(limitPrice)
-        : selectedCoinData.price;
-    return parseFloat(amount) * price;
-  };
+  const priceUsed = useMemo(() => {
+    const p = orderType === 'limit' && limitPrice ? Number(limitPrice) : Number(coin?.price ?? 0);
+    return Number.isFinite(p) ? p : 0;
+  }, [orderType, limitPrice, coin]);
 
-  const handleTrade = () => {
-    if (!user || !selectedCoinData || !amount) return;
+  const usdtBal = Number(user?.balances?.USDT ?? 0);
+  const coinBal = Number(user?.balances?.[selectedCoin] ?? 0);
+  const coinAmt = Number(amount || 0);
+  const totalUSDT = coinAmt * priceUsed;
 
-    const tradeAmount = parseFloat(amount);
-    const total = calculateTotal();
+  const canSubmit =
+    !!user &&
+    coinAmt > 0 &&
+    priceUsed > 0 &&
+    (tradeType === 'buy' ? usdtBal >= totalUSDT : coinBal >= coinAmt) &&
+    (orderType === 'market' || (orderType === 'limit' && !!limitPrice));
 
-    if (tradeType === 'buy') {
-      if (usdtBalance < total) {
-        alert('Insufficient USDT balance');
-        return;
+  async function handleConfirm() {
+    if (!user || !canSubmit) return;
+    setBusy(true);
+    try {
+      // We reuse the /exchange function for buy/sell:
+      // BUY  => from USDT, to COIN, amount = USDT value (coinAmt * price)
+      // SELL => from COIN, to USDT, amount = coinAmt
+      const payload =
+        tradeType === 'buy'
+          ? {
+              user_id: user.id,
+              from_symbol: 'USDT',
+              to_symbol: selectedCoin,
+              amount: totalUSDT, // amount is in FROM units (USDT)
+            }
+          : {
+              user_id: user.id,
+              from_symbol: selectedCoin,
+              to_symbol: 'USDT',
+              amount: coinAmt, // amount is in FROM units (COIN)
+            };
+
+      const res = await fetch('/.netlify/functions/exchange', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const j = await res.json().catch(() => ({} as any));
+      if (!res.ok || !j?.ok) {
+        throw new Error(j?.message || `Trade failed (${res.status})`);
       }
-      updateBalance('USDT', -total).catch(console.error);
-      updateBalance(selectedCoin, tradeAmount).catch(console.error);
-    } else {
-      if (userBalance < tradeAmount) {
-        alert('Insufficient balance');
-        return;
-      }
-      updateBalance(selectedCoin, -tradeAmount).catch(console.error);
-      updateBalance('USDT', total).catch(console.error);
+
+      setShowPreview(false);
+      setAmount('');
+      setLimitPrice('');
+      await refreshData?.(); // pull fresh balances/tx from server
+
+      alert(
+        tradeType === 'buy'
+          ? `Bought ${coinAmt} ${selectedCoin}`
+          : `Sold ${coinAmt} ${selectedCoin}`
+      );
+    } catch (e: any) {
+      alert(e?.message || 'Trade failed');
+      // console.error(e);
+    } finally {
+      setBusy(false);
     }
-
-    addTransaction({
-      type: 'trade',
-      coin_symbol: selectedCoin,
-      amount: tradeAmount,
-      status: 'completed',
-      user_id: user.id,
-      details: {
-        tradeType,
-        price:
-          orderType === 'limit' && limitPrice
-            ? parseFloat(limitPrice)
-            : selectedCoinData.price,
-        total,
-      },
-    }).catch(console.error);
-
-    setAmount('');
-    setLimitPrice('');
-    setShowPreview(false);
-    alert(`${tradeType === 'buy' ? 'Bought' : 'Sold'} ${tradeAmount} ${selectedCoin} successfully!`);
-  };
+  }
 
   if (!user) {
     return (
@@ -84,7 +101,7 @@ export default function TradePage() {
     <div className="min-h-screen bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-4">Spot Trading</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Spot Trading</h1>
           <p className="text-gray-400">Trade cryptocurrencies with real-time market prices</p>
         </div>
 
@@ -92,58 +109,57 @@ export default function TradePage() {
           {/* Trading Form */}
           <div className="lg:col-span-1">
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-              {/* Coin Selection */}
+              {/* Coin Select */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Select Cryptocurrency</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Select Cryptocurrency
+                </label>
                 <select
                   value={selectedCoin}
                   onChange={(e) => setSelectedCoin(e.target.value)}
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {coins.map((coin) => (
-                    <option key={coin.symbol} value={coin.symbol}>
-                      {coin.name} ({coin.symbol})
+                  {coins.map((c) => (
+                    <option key={c.symbol} value={c.symbol}>
+                      {c.name} ({c.symbol})
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Current Price */}
-              {selectedCoinData && (
+              {/* Price */}
+              {coin && (
                 <div className="mb-6 p-4 bg-gray-700 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-400">Current Price</p>
                       <p className="text-xl font-bold text-white">
                         $
-                        {selectedCoinData.price.toLocaleString(undefined, {
+                        {Number(coin.price).toLocaleString(undefined, {
                           minimumFractionDigits: 2,
-                          maximumFractionDigits:
-                            selectedCoinData.price < 1 ? 6 : 2,
+                          maximumFractionDigits: Number(coin.price) < 1 ? 6 : 2,
                         })}
                       </p>
                     </div>
                     <div
                       className={`flex items-center space-x-1 ${
-                        selectedCoinData.change_24h >= 0
-                          ? 'text-green-400'
-                          : 'text-red-400'
+                        Number(coin.change_24h) >= 0 ? 'text-green-400' : 'text-red-400'
                       }`}
                     >
-                      {selectedCoinData.change_24h >= 0 ? (
+                      {Number(coin.change_24h) >= 0 ? (
                         <TrendingUp className="w-5 h-5" />
                       ) : (
                         <TrendingDown className="w-5 h-5" />
                       )}
                       <span className="font-semibold">
-                        {selectedCoinData.change_24h.toFixed(2)}%
+                        {Number(coin.change_24h).toFixed(2)}%
                       </span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Trade Type Toggle */}
+              {/* Buy/Sell Toggle */}
               <div className="mb-6">
                 <div className="flex bg-gray-700 rounded-lg p-1">
                   <button
@@ -171,7 +187,9 @@ export default function TradePage() {
 
               {/* Order Type */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Order Type</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Order Type
+                </label>
                 <div className="flex bg-gray-700 rounded-lg p-1">
                   <button
                     onClick={() => setOrderType('market')}
@@ -196,7 +214,7 @@ export default function TradePage() {
                 </div>
               </div>
 
-              {/* Limit Price */}
+              {/* Limit price */}
               {orderType === 'limit' && (
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -227,41 +245,37 @@ export default function TradePage() {
                 <div className="mt-2 text-sm text-gray-400">
                   Available:{' '}
                   {tradeType === 'buy'
-                    ? usdtBalance.toFixed(2) + ' USDT'
-                    : userBalance.toFixed(6) + ' ' + selectedCoin}
+                    ? `${usdtBal.toFixed(2)} USDT`
+                    : `${coinBal.toFixed(6)} ${selectedCoin}`}
                 </div>
               </div>
 
               {/* Total */}
-              {amount && (
+              {coinAmt > 0 && priceUsed > 0 && (
                 <div className="mb-6 p-4 bg-gray-700 rounded-lg">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-400">Total (USDT)</span>
-                    <span className="text-white font-semibold">
-                      {calculateTotal().toFixed(2)}
-                    </span>
+                    <span className="text-white font-semibold">{totalUSDT.toFixed(2)}</span>
                   </div>
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={() => setShowPreview(true)}
-                  disabled={!amount || (orderType === 'limit' && !limitPrice)}
-                  className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                    tradeType === 'buy'
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                      : 'bg-red-600 hover:bg-red-700 text-white'
-                  } disabled:bg-gray-600 disabled:cursor-not-allowed`}
-                >
-                  Preview {tradeType === 'buy' ? 'Buy' : 'Sell'} Order
-                </button>
-              </div>
+              {/* Action */}
+              <button
+                onClick={() => setShowPreview(true)}
+                disabled={!canSubmit || busy}
+                className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                  tradeType === 'buy'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                } disabled:bg-gray-600 disabled:cursor-not-allowed`}
+              >
+                Preview {tradeType === 'buy' ? 'Buy' : 'Sell'} Order
+              </button>
             </div>
           </div>
 
-          {/* Market Data */}
+          {/* Market table (unchanged) */}
           <div className="lg:col-span-2">
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
               <h2 className="text-xl font-bold text-white mb-6">Market Overview</h2>
@@ -284,45 +298,38 @@ export default function TradePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
-                    {coins.slice(0, 10).map((coin) => (
-                      <tr key={coin.symbol} className="hover:bg-gray-700 transition-colors">
+                    {coins.slice(0, 10).map((c) => (
+                      <tr key={c.symbol} className="hover:bg-gray-700 transition-colors">
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-2">
-                            <div>
-                              <div className="text-sm font-medium text-white">{coin.name}</div>
-                              <div className="text-sm text-gray-400">{coin.symbol}</div>
-                            </div>
-                            {coin.isCustom && (
-                              <span className="bg-purple-600 text-xs px-2 py-1 rounded-full">NOVA</span>
-                            )}
-                          </div>
+                          <div className="text-sm font-medium text-white">{c.name}</div>
+                          <div className="text-sm text-gray-400">{c.symbol}</div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-white font-semibold">
                           $
-                          {coin.price.toLocaleString(undefined, {
+                          {Number(c.price).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
-                            maximumFractionDigits: coin.price < 1 ? 6 : 2,
+                            maximumFractionDigits: Number(c.price) < 1 ? 6 : 2,
                           })}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
                           <div
                             className={`flex items-center space-x-1 ${
-                              coin.change_24h >= 0 ? 'text-green-400' : 'text-red-400'
+                              Number(c.change_24h) >= 0 ? 'text-green-400' : 'text-red-400'
                             }`}
                           >
-                            {coin.change_24h >= 0 ? (
+                            {Number(c.change_24h) >= 0 ? (
                               <TrendingUp className="w-4 h-4" />
                             ) : (
                               <TrendingDown className="w-4 h-4" />
                             )}
                             <span className="text-sm font-semibold">
-                              {coin.change_24h.toFixed(2)}%
+                              {Number(c.change_24h).toFixed(2)}%
                             </span>
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
                           <button
-                            onClick={() => setSelectedCoin(coin.symbol)}
+                            onClick={() => setSelectedCoin(c.symbol)}
                             className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
                           >
                             Select
@@ -337,7 +344,7 @@ export default function TradePage() {
           </div>
         </div>
 
-        {/* Preview Modal */}
+        {/* Preview modal */}
         {showPreview && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-gray-800 rounded-lg w-full max-w-md border border-gray-700">
@@ -357,24 +364,17 @@ export default function TradePage() {
                   <div className="flex justify-between">
                     <span className="text-gray-400">Amount</span>
                     <span className="text-white">
-                      {amount} {selectedCoin}
+                      {coinAmt} {selectedCoin}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Price</span>
-                    <span className="text-white">
-                      $
-                      {(
-                        (orderType === 'limit' && limitPrice
-                          ? parseFloat(limitPrice)
-                          : selectedCoinData?.price || 0) as number
-                      ).toFixed(2)}
-                    </span>
+                    <span className="text-white">${priceUsed.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total</span>
                     <span className="text-white font-semibold">
-                      {calculateTotal().toFixed(2)} USDT
+                      {totalUSDT.toFixed(2)} USDT
                     </span>
                   </div>
                 </div>
@@ -386,12 +386,13 @@ export default function TradePage() {
                     Cancel
                   </button>
                   <button
-                    onClick={handleTrade}
+                    onClick={handleConfirm}
+                    disabled={!canSubmit || busy}
                     className={`flex-1 py-2 rounded-lg font-semibold transition-colors ${
                       tradeType === 'buy'
                         ? 'bg-green-600 hover:bg-green-700 text-white'
                         : 'bg-red-600 hover:bg-red-700 text-white'
-                    }`}
+                    } disabled:bg-gray-600 disabled:cursor-not-allowed`}
                   >
                     Confirm {tradeType === 'buy' ? 'Buy' : 'Sell'}
                   </button>

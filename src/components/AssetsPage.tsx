@@ -245,30 +245,35 @@ export default function AssetsPage() {
         </div>
 
         {/* Action Tabs */}
-        <div className="mb-8">
-          <div className="flex space-x-1 bg-gray-800 rounded-lg p-1">
-            {[
-              { id: 'overview', name: 'Overview', icon: Wallet },
-              { id: 'deposit', name: 'Deposit', icon: ArrowDownLeft },
-              { id: 'withdraw', name: 'Withdraw', icon: ArrowUpRight },
-              { id: 'exchange', name: 'Exchange', icon: ArrowUpDown },
-            ].map((tab) => {
-              const Icon = tab.icon as any;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    activeTab === tab.id ? 'bg-blue-600 text-white' : 'text-gray-300 hover:text-white hover:bg-gray-700'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+<div className="mb-8 -mx-4 md:mx-0">
+  <div className="overflow-x-auto no-scrollbar px-4">
+    <div className="inline-flex whitespace-nowrap gap-1 bg-gray-800 rounded-lg p-1">
+      {[
+        { id: 'overview', name: 'Overview', icon: Wallet },
+        { id: 'deposit',  name: 'Deposit',  icon: ArrowDownLeft },
+        { id: 'withdraw', name: 'Withdraw', icon: ArrowUpRight },
+        { id: 'exchange', name: 'Exchange', icon: ArrowUpDown },
+      ].map((tab) => {
+        const Icon = tab.icon as any;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-300 hover:text-white hover:bg-gray-700'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            <span>{tab.name}</span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+</div>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
