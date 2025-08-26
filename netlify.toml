@@ -1,4 +1,3 @@
-# netlify.toml
 [build]
   command = "npm run build"
   publish = "dist"
@@ -8,26 +7,19 @@
   node_bundler = "esbuild"
   external_node_modules = ["@neondatabase/serverless"]
 
-# 1) Canonicalize www -> apex (if you use this domain)
+# Canonicalize www -> apex (optional, if you use this domain)
 [[redirects]]
   from = "https://www.novatradeapp.com/*"
   to   = "https://novatradeapp.com/:splat"
   status = 301
   force = true
 
-# 2) Let function routes pass through (must be before SPA fallback)
-[[redirects]]
-  from = "/.netlify/functions/*"
-  to   = "/.netlify/functions/:splat"
-  status = 200
-  force = true
-
-# 3) SPA fallback
+# SPA fallback
 [[redirects]]
   from = "/*"
   to   = "/index.html"
   status = 200
 
-# 4) Scheduled function (runs daily at 03:00 UTC)
+# Scheduled function
 [functions."applyMoonPlan"]
   schedule = "0 3 * * *"
