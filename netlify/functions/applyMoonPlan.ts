@@ -1,7 +1,8 @@
 // netlify/functions/applyMoonPlan.ts
 import type { Handler } from '@netlify/functions';
 
-export const config = { schedule: '@daily' };
+export const config = { schedule: '5 15 * * *' }; // e.g., 00:05 JST
+
 
 const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 const resp = (statusCode: number, body: unknown) =>
