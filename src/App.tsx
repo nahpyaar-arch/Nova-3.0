@@ -1,20 +1,19 @@
-// src/App.tsx
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AppProvider, useApp } from './contexts/AppContext';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
 
 // ── Route-level code splitting (reduces initial JS) ─────────────────────────
-const HomePage    = lazy(() => import('./components/HomePage'));
-const MarketPage  = lazy(() => import('./components/MarketPage'));
-const TradePage   = lazy(() => import('./components/TradePage'));
-const AssetsPage  = lazy(() => import('./components/AssetsPage'));
+const HomePage = lazy(() => import('./components/HomePage'));
+const MarketPage = lazy(() => import('./components/MarketPage'));
+const TradePage = lazy(() => import('./components/TradePage'));
+const AssetsPage = lazy(() => import('./components/AssetsPage'));
 const ProfilePage = lazy(() => import('./components/ProfilePage'));
-const AdminPage   = lazy(() => import('./components/AdminPage'));
+const AdminPage = lazy(() => import('./components/AdminPage'));
 
 // Dev helpers (lazy too, so they don’t bloat prod)
-const DebugEnv    = lazy(() => import('./pages/DebugEnv'));
+const DebugEnv = lazy(() => import('./pages/DebugEnv'));
 
 // ── Dev-only helper page: promote or create admin, then refresh ────────────
 function SeedAdminPage() {
