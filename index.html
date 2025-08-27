@@ -3,9 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Mobile & safe-area -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b1020" />
+
     <title>Nova - Cryptocurrency Trading Platform</title>
-    <meta name="description" content="Nova - The next generation cryptocurrency trading platform with real-time market data, secure trading, and comprehensive portfolio management." />
+    <meta
+      name="description"
+      content="Nova - The next generation cryptocurrency trading platform with real-time market data, secure trading, and comprehensive portfolio management."
+    />
+
+    <!-- Perf: warm up connections (update SUPABASE_HOST to your project) -->
+    <link rel="preconnect" href="https://api.binance.com" />
+    <link rel="dns-prefetch" href="https://api.binance.com" />
+    <link rel="preconnect" href="https://zngdfevnruxghcyckjls.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://zngdfevnruxghcyckjls.supabase.co" />
   </head>
   <body>
     <div id="root"></div>
