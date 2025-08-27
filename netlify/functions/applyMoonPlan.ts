@@ -1,19 +1,15 @@
 // netlify/functions/applyMoonPlan.ts
 import type { Handler } from '@netlify/functions';
-import { neon } from '@neondatabase/serverless';
 
 export const config = { schedule: '@daily' };
 
-const headers = {
-  'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
-};
+const headers = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
 const resp = (statusCode: number, body: unknown) =>
   ({ statusCode, headers, body: JSON.stringify(body) });
 
 export const handler: Handler = async (event) => {
   try {
-    // Optional manual trigger: /.netlify/functions/applyMoonPlan?run=now&key=SECRET
+    // manual trigger: ?run=now&key=SECRET
     const runNow = (event.queryStringParameters?.run || '').toLowerCase() === 'now';
     if (runNow) {
       const key = event.queryStringParameters?.key || '';
@@ -26,12 +22,13 @@ export const handler: Handler = async (event) => {
       process.env.DATABASE_URL ||
       process.env.NEON_DATABASE_URL ||
       process.env.VITE_DATABASE_URL;
-
     if (!dbUrl) return resp(500, { ok: false, error: 'DATABASE_URL not set' });
 
+    // ✅ dynamic import so module errors are catchable
+    const { neon } = await import('@neondatabase/serverless');
     const sql = neon(dbUrl);
 
-    // Ensure idempotency ledger exists
+    // idempotency ledger (simple & robust)
     await sql`
       CREATE TABLE IF NOT EXISTS planner_runs (
         day date PRIMARY KEY,
@@ -41,69 +38,59 @@ export const handler: Handler = async (event) => {
       )
     `;
 
-    // Today in JST
+    // today in JST
     const r1 = await sql`SELECT (now() AT TIME ZONE 'Asia/Tokyo')::date AS d`;
-    const todayJST = String(r1[0]?.d); // e.g., "2025-08-28"
+    const todayJST = String(r1[0]?.d);
 
-    // Already applied today?
-    const already = await sql`SELECT 1 FROM planner_runs WHERE day=${todayJST} LIMIT 1`;
-    if (already.length) {
-      return resp(200, { ok: true, message: `Already applied for ${todayJST}` });
-    }
+    // already applied?
+    const ran = await sql`SELECT 1 FROM planner_runs WHERE day=${todayJST} LIMIT 1`;
+    if (ran.length) return resp(200, { ok: true, message: `Already applied for ${todayJST}` });
 
-    // Pull today's plan
+    // plan
     const planRows = await sql`
       SELECT target_pct::numeric AS pct, COALESCE(note,'') AS note
-      FROM moon_plans
-      WHERE day = ${todayJST}
-      LIMIT 1
+      FROM moon_plans WHERE day=${todayJST} LIMIT 1
     `;
-    if (planRows.length === 0) {
-      return resp(200, { ok: true, message: `No plan for ${todayJST}` });
-    }
-    const pct: number = Number(planRows[0].pct);
-    const note: string = String(planRows[0].note || '');
+    if (!planRows.length) return resp(200, { ok: true, message: `No plan for ${todayJST}` });
 
-    // Current price
+    const pct = Number(planRows[0].pct);
+    const note = String(planRows[0].note || '');
+
+    // current price
     const curRow = await sql`SELECT price FROM coins WHERE symbol='MOON' LIMIT 1`;
-    if (curRow.length === 0) return resp(500, { ok: false, error: 'MOON not found in coins' });
+    if (!curRow.length) return resp(500, { ok: false, error: 'MOON not found' });
 
     const cur = Number(curRow[0].price);
     const next = Number((cur * (1 + pct / 100)).toFixed(8));
 
-    // Apply update
+    // apply
     await sql`UPDATE coins SET price=${next}, change_24h=${pct} WHERE symbol='MOON'`;
 
-    // Record idempotent run
-    await sql`
-      INSERT INTO planner_runs(day, pct, note)
-      VALUES (${todayJST}, ${pct}, ${note})
-      ON CONFLICT (day) DO NOTHING
-    `;
+    // record idempotent run
+    await sql`INSERT INTO planner_runs(day, pct, note) VALUES (${todayJST}, ${pct}, ${note})
+              ON CONFLICT (day) DO NOTHING`;
 
-    // Best-effort logging to price_history (schema-agnostic)
-    const logMsg = `Applied ${pct}% for ${todayJST}${note ? ' — ' + note : ''}`;
-
+    // best-effort log to price_history (schema-agnostic)
+    const msg = `Applied ${pct}% for ${todayJST}${note ? ' — ' + note : ''}`;
     try {
-      // Variant A: coin_symbol / created_at
-      await sql`
-        INSERT INTO price_history (coin_symbol, price, created_at, source, note)
-        VALUES ('MOON', ${next}, now(), 'planner', ${logMsg})
-      `;
+      await sql`INSERT INTO price_history(coin_symbol, price, created_at, source, note)
+                VALUES ('MOON', ${next}, now(), 'planner', ${msg})`;
     } catch {
       try {
-        // Variant B: symbol / ts
-        await sql`
-          INSERT INTO price_history (symbol, price, ts, source, note)
-          VALUES ('MOON', ${next}, now(), 'planner', ${logMsg})
-        `;
+        await sql`INSERT INTO price_history(symbol, price, ts, source, note)
+                  VALUES ('MOON', ${next}, now(), 'planner', ${msg})`;
       } catch {
-        // If neither schema matches, ignore; planner_runs is our source of truth
+        // ignore if table/columns differ; planner_runs is our source of truth
       }
     }
 
     return resp(200, { ok: true, applied_for: todayJST, pct, old: cur, next });
   } catch (err: any) {
-    return resp(500, { ok: false, error: err?.message || String(err) });
+    const debug = (event.queryStringParameters?.debug || '') === '1';
+    return resp(500, {
+      ok: false,
+      error: err?.message || String(err),
+      stack: debug ? err?.stack : undefined,
+    });
   }
 };
