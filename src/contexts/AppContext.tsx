@@ -284,17 +284,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   /* ────────────── Auth: Supabase + server upsert + server read ────────────── */
   const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      // 1) Supabase auth (lazy)
-      const { supabase } = await sb(); // 👈 lazy
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        console.error('Auth signIn failed:', error);
-        return false;
-      }
+  try {
+    // 1) Supabase auth (lazy)
+    const { getSupabase } = await sb();
+    const supabase = await getSupabase();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      console.error('Auth signIn failed:', error);
+      return false;
+    }
+
+    // 2) Upsert profile on server …
+    // (rest unchanged)
+
 
       // 2) Upsert profile on the server (Netlify Function → Neon)
       try {
@@ -340,19 +346,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (
-    email: string,
-    password: string,
-    name: string
-  ): Promise<boolean> => {
-    try {
-      const { supabase, createProfile } = await sb(); // 👈 lazy
-      // 1) Create auth user in Supabase
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: window.location.origin + '/profile' },
-      });
+ const register = async (email: string, password: string, name: string): Promise<boolean> => {
+  try {
+    const { getSupabase, createProfile } = await sb();
+    const supabase = await getSupabase();
+
+    // 1) Create auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: window.location.origin + '/profile' },
+    });
+    // …
+
       console.log('supabase.auth.signUp →', { authData, authError });
       if (authError) {
         alert(`Sign up failed: ${authError.message}`);
@@ -404,16 +410,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async (): Promise<void> => {
-    try {
-      const { supabase } = await sb(); // 👈 lazy
-      await supabase.auth.signOut();
-    } catch {
-      // ignore
-    }
-    setUser(null);
-    setTransactions([]);
-    localStorage.removeItem('nova_user_email');
-  };
+  try {
+    const { getSupabase } = await sb();
+    const supabase = await getSupabase();
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+  setUser(null);
+  setTransactions([]);
+  localStorage.removeItem('nova_user_email');
+};
+
 
   /* ────────────── Data mutations ────────────── */
   const updateBalance = async (

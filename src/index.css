@@ -2,17 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme tokens */
+/* ─── Theme tokens ────────────────────────────────────────────────────────── */
 :root {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
   --border: 217.2 32.6% 17.5%;
 }
 
-/* Base layer using the tokens */
+/* ─── Base layer using tokens ─────────────────────────────────────────────── */
 @layer base {
+  /* Tailwind arbitrary color needs full color value */
   * {
-    /* Tailwind arbitrary border color expects a full color value */
     @apply border-[hsl(var(--border))];
   }
   body {
@@ -20,7 +20,7 @@
   }
 }
 
-/* System font stack + smoothing */
+/* ─── System font stack + smoothing ───────────────────────────────────────── */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -30,11 +30,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Utilities */
+/* ─── Utilities ───────────────────────────────────────────────────────────── */
 
 /* hide horizontal scrollbar for the tabs scroller */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* optional: add safe-area bottom padding if you need it on some containers */
+/* add safe-area bottom padding if needed */
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

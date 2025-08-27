@@ -2,7 +2,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { User, Mail, Globe, Bell, Shield, LogOut } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { pingSupabase, supabase } from '../lib/supabase';
+import { pingSupabase, getSupabase } from '../lib/supabase';
+
 
 export default function ProfilePage() {
   const { user, login, register, logout, language, setLanguage, refreshData, t } = useApp();
@@ -22,7 +23,8 @@ export default function ProfilePage() {
   }, []);
 
   // DEV: write a quick test row to confirm insert policy works
-  const insertTestProfile = async () => {
+   const insertTestProfile = async () => {
+    const supabase = await getSupabase(); // ✅ grab lazy client
     const testEmail = `dev+${Date.now()}@example.com`;
     const { data, error } = await supabase
       .from('profiles')

@@ -1,27 +1,51 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
+
+    <!-- Favicon / PWA (optional: add real assets when you have them) -->
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Mobile & safe-area -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#0b1020" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
     <title>Nova - Cryptocurrency Trading Platform</title>
     <meta
       name="description"
-      content="Nova - The next generation cryptocurrency trading platform with real-time market data, secure trading, and comprehensive portfolio management."
+      content="Nova — next-generation crypto trading with real-time markets, secure execution, and rich portfolio tools."
     />
 
-    <!-- Perf: warm up connections (update SUPABASE_HOST to your project) -->
+    <!-- Perf: warm up connections -->
     <link rel="preconnect" href="https://api.binance.com" />
     <link rel="dns-prefetch" href="https://api.binance.com" />
+    <!-- Supabase: replace host if your project id changes -->
     <link rel="preconnect" href="https://zngdfevnruxghcyckjls.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://zngdfevnruxghcyckjls.supabase.co" />
+
+    <!-- Minimal CSP (relaxed for Vite dev; harden for prod as needed) -->
+    <!--
+    <meta http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self' 'unsafe-inline' 'unsafe-eval';
+               style-src 'self' 'unsafe-inline';
+               img-src 'self' data:;
+               connect-src 'self' https://api.binance.com https://zngdfevnruxghcyckjls.supabase.co;
+               font-src 'self' data:;
+               frame-ancestors 'none';">
+    -->
   </head>
   <body>
+    <noscript>
+      <style>body{background:#0b1020;color:#cbd5e1;font:14px system-ui, -apple-system, Segoe UI, Roboto}</style>
+      Nova requires JavaScript to run. Please enable it to continue.
+    </noscript>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
