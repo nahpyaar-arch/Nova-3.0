@@ -33,8 +33,71 @@ body {
 /* ─── Utilities ───────────────────────────────────────────────────────────── */
 
 /* hide horizontal scrollbar for the tabs scroller */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
 /* add safe-area bottom padding if needed */
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ─── Hide default Tawk.to floating widget ────────────────────────────────── */
+/* Hide Tawk.to default floating launcher */
+iframe[title="chat widget"],
+iframe[src*="tawk.to"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ─── Hide LiveChat floating widget ───────────────────────────────────────── */
+/* Targeting LiveChat iframe and widget */
+#LiveChat1,
+#LiveChat1_0,
+iframe[src*="livechatinc.com"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ─── Keep the LiveChat button visible but hide the floating icon ───────────── */
+#LiveChat1_button {
+  display: block !important;
+}
+
+/* ─── Style the live chat button (optional customization) ───────────────────── */
+/* Ensure the LiveChat button is visually prominent but doesn't interfere with UI */
+#LiveChat1_button {
+  position: fixed !important;
+  bottom: 16px !important;
+  right: 16px !important;
+  z-index: 1000 !important;
+  background-color: #0a74da; /* Adjust button color */
+  padding: 12px 16px;
+  border-radius: 50%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#LiveChat1_button:hover {
+  background-color: #005a9c; /* Darker shade for hover effect */
+}
+
+#LiveChat1_button:focus {
+  outline: none;
+}
+
+/* ─── Mobile adjustments for bottom tabs (ensure visibility) ─────────────── */
+@media (max-width: 768px) {
+  #LiveChat1_button {
+    bottom: 80px !important; /* Adjust for mobile bottom tab bar */
+  }
+}
