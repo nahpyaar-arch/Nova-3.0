@@ -4,7 +4,12 @@ import { AppProvider, useApp } from './contexts/AppContext';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
 
-// ── Route-level code splitting (reduces initial JS) ─────────────────────────
+// ✅ Import i18n provider
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n.ts';
+ // make sure you have an i18n.ts setup file
+
+// ── Route-level code splitting ─────────────────────────
 const HomePage = lazy(() => import('./components/HomePage'));
 const MarketPage = lazy(() => import('./components/MarketPage'));
 const TradePage = lazy(() => import('./components/TradePage'));
@@ -12,10 +17,10 @@ const AssetsPage = lazy(() => import('./components/AssetsPage'));
 const ProfilePage = lazy(() => import('./components/ProfilePage'));
 const AdminPage = lazy(() => import('./components/AdminPage'));
 
-// Dev helpers (lazy too, so they don’t bloat prod)
+// Dev helpers
 const DebugEnv = lazy(() => import('./pages/DebugEnv'));
 
-// ── Dev-only helper page: promote or create admin, then refresh ────────────
+// ── Dev-only helper page ───────────────────────────────
 function SeedAdminPage() {
   const [msg, setMsg] = useState<string>('Seeding admin…');
   const { refreshData } = useApp();
@@ -23,7 +28,6 @@ function SeedAdminPage() {
   useEffect(() => {
     (async () => {
       try {
-        // uses the client NeonDB stub (safe on dev)
         const { NeonDB } = await import('./lib/neon');
         const promoted = await (NeonDB as any).promoteAdminByEmail?.('admin52980@gmail.com');
         if (promoted) {
@@ -47,7 +51,7 @@ function SeedAdminPage() {
   );
 }
 
-// ── Tiny dev ribbon (only in dev) ───────────────────────────────────────────
+// ── Tiny dev ribbon ───────────────────────────────────
 function DevRibbon() {
   if (!import.meta.env.DEV) return null;
   return (
@@ -70,91 +74,95 @@ function DevRibbon() {
   );
 }
 
+// ── Main App ──────────────────────────────────────────
 export default function App() {
   return (
-    <AppProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-900 text-white">
-          <Routes>
-            <Route element={<Layout />}>
-              <Route
-                index
-                element={
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <HomePage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="market"
-                element={
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <MarketPage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="trade"
-                element={
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <TradePage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="assets"
-                element={
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <AssetsPage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="profile"
-                element={
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <ProfilePage />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="admin"
-                element={
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <AdminPage />
-                  </Suspense>
-                }
-              />
+    // ✅ Wrap whole app in I18nextProvider so translations work everywhere
+    <I18nextProvider i18n={i18n}>
+      <AppProvider>
+        <Router>
+          <div className="min-h-screen bg-gray-900 text-white">
+            <Routes>
+              <Route element={<Layout />}>
+                <Route
+                  index
+                  element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <HomePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="market"
+                  element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <MarketPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="trade"
+                  element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <TradePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="assets"
+                  element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <AssetsPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="profile"
+                  element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <ProfilePage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="admin"
+                  element={
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <AdminPage />
+                    </Suspense>
+                  }
+                />
 
-              {/* dev-only routes */}
-              {import.meta.env.DEV && (
-                <>
-                  <Route
-                    path="dev/env"
-                    element={
-                      <Suspense fallback={<LoadingSpinner />}>
-                        <DebugEnv />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="dev/seed-admin"
-                    element={
-                      <Suspense fallback={<LoadingSpinner />}>
-                        <SeedAdminPage />
-                      </Suspense>
-                    }
-                  />
-                </>
-              )}
-            </Route>
+                {/* dev-only routes */}
+                {import.meta.env.DEV && (
+                  <>
+                    <Route
+                      path="dev/env"
+                      element={
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <DebugEnv />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="dev/seed-admin"
+                      element={
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <SeedAdminPage />
+                        </Suspense>
+                      }
+                    />
+                  </>
+                )}
+              </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </div>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
 
-        <DevRibbon />
-      </Router>
-    </AppProvider>
+          <DevRibbon />
+        </Router>
+      </AppProvider>
+    </I18nextProvider>
   );
 }

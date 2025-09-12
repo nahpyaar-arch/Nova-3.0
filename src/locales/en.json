@@ -1,0 +1,181 @@
+{
+  "home": {
+    "welcomeBack": "Welcome back to",
+    "welcome": "Welcome to",
+    "loadingTitle": "Loading Market Data",
+    "loadingSubtitle": "Fetching real-time prices…",
+    "gateway": "Your gateway to the future of cryptocurrency trading",
+    "exploreMarkets": "Explore Markets",
+    "startTrading": "Start Trading",
+    "featured": "Featured Cryptocurrencies",
+    "volume": "Volume",
+    "liveMarket": "Live Market Data",
+    "realTimePrices": "Real-time prices",
+    "coin": "Coin",
+    "price": "Price",
+    "change": "24h Change",
+    "tagline": "The next generation cryptocurrency trading platform. Trade with confidence, security, and speed.",
+    "getStarted": "Get Started",
+    "whyChoose": "Why Choose Nova?",
+    "futureExperience": "Experience the future of cryptocurrency trading",
+    "fast": "Lightning Fast",
+    "fastDesc": "Execute trades in milliseconds with our advanced matching engine and real-time market data.",
+    "security": "Bank-Grade Security",
+    "securityDesc": "Your assets are protected with military-grade encryption and multi-layer security protocols.",
+    "global": "Global Access",
+    "globalDesc": "Trade from anywhere in the world with support for 10 languages and 24/7 customer support."
+  },
+  "market": {
+  "title": "Cryptocurrency Market",
+  "subtitle": "Real-time prices and market data",
+  "searchPlaceholder": "Search cryptocurrencies...",
+  "coin": "Coin",
+  "price": "Price",
+  "change": "24h Change",
+  "volume": "Volume",
+  "marketCap": "Market Cap",
+  "action": "Action",
+  "tradeBtn": "Trade",
+  "currentPrice": "Current Price",
+  "novaExclusiveTitle": "Nova Exclusive",
+  "novaExclusiveDesc": "MOON is Nova's exclusive cryptocurrency with admin-controlled pricing and special features.",
+  "buyBtn": "Buy {{symbol}}",
+  "sellBtn": "Sell {{symbol}}",
+  "selectPrompt": "Select a cryptocurrency to view details"
+},
+
+  "trade": {
+  "title": "Spot Trading",
+  "subtitle": "Trade cryptocurrencies with real-time market prices",
+  "loginRequired": "Please log in to trade",
+  "loginMessage": "You need to be logged in to access the trading platform.",
+  "selectCoin": "Select Cryptocurrency",
+  "currentPrice": "Current Price",
+  "buy": "Buy",
+  "sell": "Sell",
+  "orderType": "Order Type",
+  "market": "Market",
+  "limit": "Limit",
+  "limitPrice": "Limit Price (USDT)",
+  "amount": "Amount ({{symbol}})",
+  "amountPlaceholder": "Enter amount",
+  "available": "Available:",
+  "total": "Total (USDT)",
+  "previewBuy": "Preview Buy Order",
+  "previewSell": "Preview Sell Order",
+  "previewTitle": "Order Preview",
+  "type": "Type",
+  "amountLabel": "Amount",
+  "price": "Price",
+  "cancel": "Cancel",
+  "confirmBuy": "Confirm Buy",
+  "confirmSell": "Confirm Sell",
+  "marketOverview": "Market Overview",
+  "select": "Select",
+  "successBuy": "Bought {{amount}} {{symbol}} successfully",
+  "successSell": "Sold {{amount}} {{symbol}} successfully",
+  "failed": "Trade failed"
+}
+,
+ "assets": {
+  "title": "My Assets",
+  "subtitle": "Manage your cryptocurrency portfolio",
+  "portfolioValue": "Portfolio Value",
+  "portfolioDesc": "Total portfolio value in USD",
+  "tabs": {
+    "overview": "Overview",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "exchange": "Exchange"
+  },
+  "overview": {
+    "title": "Asset Balances",
+    "asset": "Asset",
+    "balance": "Balance",
+    "value": "Value (USD)",
+    "price": "Price"
+  },
+  "deposit": {
+    "title": "Deposit Cryptocurrency",
+    "select": "Select Cryptocurrency",
+    "network": "Network",
+    "networkSelect": "Select Network",
+    "address": "Deposit Address",
+    "amount": "Amount",
+    "amountPlaceholder": "Enter deposit amount",
+    "importantTitle": "Important:",
+    "importantDesc": "Deposits require admin approval. Please allow 1–24 hours.",
+    "submit": "Submit Deposit Request",
+    "submitted": "Deposit request submitted for admin approval."
+  },
+  "withdraw": {
+    "title": "Withdraw Cryptocurrency",
+    "select": "Select Cryptocurrency",
+    "available": "Available: {{amt}} {{coin}}",
+    "network": "Network",
+    "networkSelect": "Select Network",
+    "address": "Destination Address",
+    "addressPlaceholder": "Enter destination wallet address",
+    "memo": "Memo (Optional)",
+    "memoPlaceholder": "Enter memo if required",
+    "amount": "Amount",
+    "amountPlaceholder": "Enter withdrawal amount",
+    "fee": "Network Fee",
+    "arrival": "Estimated Arrival",
+    "minutes": "minutes",
+    "warningTitle": "Warning:",
+    "warningDesc": "Withdrawals require admin approval and cannot be reversed. Double-check all details.",
+    "submit": "Submit Withdrawal Request",
+    "submitted": "Withdrawal request submitted for admin approval."
+  },
+  "exchange": {
+    "title": "Exchange Cryptocurrency",
+    "from": "From",
+    "to": "To",
+    "available": "Available: {{amt}} {{coin}}",
+    "amount": "Amount to Exchange",
+    "amountPlaceholder": "Enter {{coin}} amount",
+    "previewTitle": "Exchange Preview",
+    "youPay": "You pay",
+    "fee": "Exchange fee (0.1%)",
+    "youReceive": "You receive (approx.)",
+    "submit": "Exchange {{from}} for {{to}}",
+    "success": "Exchanged {{amt}} {{from}} → {{got}} {{to}}"
+  },
+  "sidebar": {
+    "title": "Quick Stats",
+    "totalAssets": "Total Assets",
+    "largest": "Largest Holding",
+    "diversity": "Portfolio Diversity",
+    "none": "None",
+    "coins": "coins"
+  },
+  "errors": {
+    "signIn": "Please sign in again.",
+    "depositInvalid": "Enter a valid amount and network.",
+    "depositFailed": "Deposit failed",
+    "withdrawInvalid": "Fill in address, network, and a valid amount.",
+    "insufficient": "Insufficient balance.",
+    "withdrawFailed": "Withdrawal failed",
+    "exchangeSame": "Choose two different coins.",
+    "exchangeInvalid": "Enter a valid amount.",
+    "exchangeFailed": "Exchange failed"
+  },
+  "login": {
+    "title": "Please log in to view assets",
+    "desc": "You need to be logged in to access your portfolio."
+  }
+}
+
+,
+  "profile": { "title": "Profile Settings" },
+
+  "nav": {
+    "home": "Home",
+    "market": "Market",
+    "trade": "Trade",
+    "assets": "Assets",
+    "profile": "Profile"
+  }
+}
+

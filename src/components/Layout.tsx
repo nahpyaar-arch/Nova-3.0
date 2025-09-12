@@ -11,12 +11,17 @@ import {
   Menu,
   X,
   Shield,
-  MessageCircle, // ✅ FIX: import icon
+  MessageCircle,
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import BottomTabs from './BottomTabs';
+import i18n from '../i18n';
 
-// ✅ FIX: tell TypeScript about Tawk_API
+
+// 👈 correct path
+
+
+// ✅ Tell TypeScript about Tawk_API
 declare global {
   interface Window {
     Tawk_API?: any;
@@ -50,7 +55,6 @@ export default function Layout() {
     { key: 'assets', name: t('nav.assets'), href: '/assets', icon: Wallet },
     { key: 'profile', name: t('nav.profile'), href: '/profile', icon: User },
   ] as Array<{ key: string; name: string; href: string; icon: any }>;
-
 
   if (user?.is_admin) {
     nav.push({ key: 'admin', name: t('nav.admin'), href: '/admin', icon: Shield });
@@ -132,7 +136,9 @@ export default function Layout() {
                         <button
                           key={lang.code}
                           onClick={() => {
-                            setLanguage(lang.code);
+                            setLanguage(lang.code);       // update your context
+                            i18n.changeLanguage(lang.code); // ✅ switch i18n language
+                            console.log('Language switched to:', lang.code);
                             setIsLanguageOpen(false);
                           }}
                           className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 flex items-center space-x-2 ${

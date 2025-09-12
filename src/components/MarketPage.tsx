@@ -2,9 +2,11 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, Search, Star } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { useTranslation } from 'react-i18next';
 
 export default function MarketPage() {
   const { coins } = useApp();
+  const { t } = useTranslation(); // ✅ i18n hook
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCoin, setSelectedCoin] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -26,8 +28,10 @@ export default function MarketPage() {
     <div className="min-h-screen bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-4">Cryptocurrency Market</h1>
-          <p className="text-gray-400">Real-time prices and market data</p>
+          <h1 className="text-3xl font-bold text-white mb-4">
+            {t('market.title')}
+          </h1>
+          <p className="text-gray-400">{t('market.subtitle')}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -39,7 +43,7 @@ export default function MarketPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search cryptocurrencies..."
+                  placeholder={t('market.searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -53,12 +57,12 @@ export default function MarketPage() {
                 <table className="w-full">
                   <thead className="bg-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Coin</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Price</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">24h Change</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Volume</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Market Cap</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Action</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('market.coin')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('market.price')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('market.change')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('market.volume')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('market.marketCap')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('market.action')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-700">
@@ -123,7 +127,7 @@ export default function MarketPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                            Trade
+                            {t('market.tradeBtn')}
                           </button>
                         </td>
                       </tr>
@@ -161,7 +165,7 @@ export default function MarketPage() {
 
                   <div className="space-y-4">
                     <div>
-                      <p className="text-gray-400 text-sm">Current Price</p>
+                      <p className="text-gray-400 text-sm">{t('market.currentPrice')}</p>
                       <p className="text-2xl font-bold text-white">
                         $
                         {selectedCoinData.price.toLocaleString(undefined, {
@@ -172,7 +176,7 @@ export default function MarketPage() {
                     </div>
 
                     <div>
-                      <p className="text-gray-400 text-sm">24h Change</p>
+                      <p className="text-gray-400 text-sm">{t('market.change')}</p>
                       <div
                         className={`flex items-center space-x-1 ${
                           selectedCoinData.change_24h >= 0 ? 'text-green-400' : 'text-red-400'
@@ -190,14 +194,14 @@ export default function MarketPage() {
                     </div>
 
                     <div>
-                      <p className="text-gray-400 text-sm">24h Volume</p>
+                      <p className="text-gray-400 text-sm">{t('market.volume')}</p>
                       <p className="text-lg font-semibold text-white">
                         ${(selectedCoinData.volume / 1_000_000).toFixed(2)}M
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-gray-400 text-sm">Market Cap</p>
+                      <p className="text-gray-400 text-sm">{t('market.marketCap')}</p>
                       <p className="text-lg font-semibold text-white">
                         ${(selectedCoinData.market_cap / 1_000_000_000).toFixed(2)}B
                       </p>
@@ -205,9 +209,9 @@ export default function MarketPage() {
 
                     {selectedCoinData.isCustom && (
                       <div className="bg-purple-900 bg-opacity-50 rounded-lg p-4 border border-purple-500">
-                        <h3 className="text-purple-400 font-semibold mb-2">Nova Exclusive</h3>
+                        <h3 className="text-purple-400 font-semibold mb-2">{t('market.novaExclusiveTitle')}</h3>
                         <p className="text-sm text-gray-300">
-                          MOON is Nova's exclusive cryptocurrency with admin-controlled pricing and special features.
+                          {t('market.novaExclusiveDesc')}
                         </p>
                       </div>
                     )}
@@ -215,17 +219,17 @@ export default function MarketPage() {
 
                   <div className="mt-6 space-y-3">
                     <button className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg transition-colors">
-                      Buy {selectedCoinData.symbol}
+                      {t('market.buyBtn', { symbol: selectedCoinData.symbol })}
                     </button>
                     <button className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors">
-                      Sell {selectedCoinData.symbol}
+                      {t('market.sellBtn', { symbol: selectedCoinData.symbol })}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-12">
                   <TrendingUp className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-400">Select a cryptocurrency to view details</p>
+                  <p className="text-gray-400">{t('market.selectPrompt')}</p>
                 </div>
               )}
             </div>

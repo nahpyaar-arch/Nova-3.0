@@ -16,9 +16,11 @@
     "@neondatabase/serverless": "^1.0.1",
     "@netlify/functions": "^4.2.2",
     "@supabase/supabase-js": "^2.56.0",
+    "i18next": "^25.5.2",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-i18next": "^15.7.3",
     "react-router-dom": "^6.15.0",
     "recharts": "^2.8.0"
   },
