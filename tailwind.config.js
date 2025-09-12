@@ -56,6 +56,18 @@ export default {
           900: '#78350f',
         },
       },
+
+      // 🔹 Binance-like font scale
+      fontSize: {
+        xs: ['11px', { lineHeight: '1.3' }],  // captions, tags
+        sm: ['12px', { lineHeight: '1.3' }],  // small labels
+        base: ['14px', { lineHeight: '1.4' }], // default text
+        lg: ['16px', { lineHeight: '1.4' }],   // subheadings
+        xl: ['18px', { lineHeight: '1.4' }],   // headings
+        '2xl': ['20px', { lineHeight: '1.3' }], // card titles
+        '3xl': ['24px', { lineHeight: '1.3' }], // section headers
+      },
+
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.3s ease-out',
