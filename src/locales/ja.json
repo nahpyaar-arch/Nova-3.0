@@ -86,6 +86,15 @@
       "withdraw": "出金",
       "exchange": "交換"
     },
+    
+"overview": {
+  "title": "資産残高",
+  "asset": "資産",
+  "balance": "残高",
+  "value": "評価額 (USD)",
+  "price": "価格"
+}
+,
     "deposit": {
       "title": "暗号通貨を入金",
       "select": "暗号通貨を選択",

@@ -86,6 +86,14 @@
       "withdraw": "Prelievo",
       "exchange": "Scambio"
     },
+    "overview": {
+  "title": "Saldi degli asset",
+  "asset": "Asset",
+  "balance": "Saldo",
+  "value": "Valore (USD)",
+  "price": "Prezzo"
+}
+,
     "deposit": {
       "title": "Deposita criptovalute",
       "select": "Seleziona criptovaluta",

@@ -14,11 +14,18 @@
   status = 301
   force = true
 
-# SPA fallback
+# 🚧 Maintenance mode redirect
+# This will override all routes and show maintenance.html
 [[redirects]]
   from = "/*"
-  to   = "/index.html"
+  to   = "/maintenance.html"
   status = 200
+
+# SPA fallback (⚠️ disable/remove this while maintenance mode is active)
+# [[redirects]]
+#   from = "/*"
+#   to   = "/index.html"
+#   status = 200
 
 # Scheduled function
 [functions."applyMoonPlan"]
