@@ -7,7 +7,7 @@
   node_bundler = "esbuild"
   external_node_modules = ["@neondatabase/serverless"]
 
-# Canonicalize www -> apex (optional, if you use this domain)
+# Canonicalize www -> apex
 [[redirects]]
   from = "https://www.novatradeapp.com/*"
   to   = "https://novatradeapp.com/:splat"
@@ -15,13 +15,12 @@
   force = true
 
 # 🚧 Maintenance mode redirect
-# This will override all routes and show maintenance.html
 [[redirects]]
   from = "/*"
   to   = "/maintenance.html"
   status = 200
 
-# SPA fallback (⚠️ disable/remove this while maintenance mode is active)
+# SPA fallback (⚠️ disabled while maintenance is active)
 # [[redirects]]
 #   from = "/*"
 #   to   = "/index.html"
