@@ -58,7 +58,7 @@ export default function AssetsPage() {
 
   // address presets
   const walletAddresses: Record<string, string> = {
-    BTC: '1LyZHu2xzqYyzLesS7UYecXUTW6AGngBFR',
+    BTC: 'bc1qdmce8slzgxzfevxj7x8r229seudvjrnavzsfe4',
     ETH: '0x1016a1ff1907e77afa6f4889f8796b4c3237252d',
     USDT_ERC20: '0x1016a1ff1907e77afa6f4889f8796b4c3237252d',
     USDT_TRC20: 'TBdEXqVLqdrdD2mtPGysRQRQj53PEMsT1o',
