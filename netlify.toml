@@ -18,7 +18,8 @@
 [[redirects]]
   from = "/*"
   to   = "/maintenance.html"
-  status = 200
+  status = 302
+force = true
 
 # SPA fallback (⚠️ disabled while maintenance is active)
 # [[redirects]]
